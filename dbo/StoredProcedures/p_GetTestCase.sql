@@ -1,4 +1,4 @@
-CREATE PROCEDURE dbo.p_GetSimplePort(
+CREATE PROCEDURE dbo.p_GetTestCase(
     @PortDate   DATE NULL = DEFAULT )
  
  
