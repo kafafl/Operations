@@ -21,7 +21,7 @@ CREATE PROCEDURE dbo.p_GetSimplePort(
          SELECT @PortDate = CAST(GETDATE() AS DATE)
        END
 
-     SELECT pmp.PortDate,
+     SELECT TOP 50 pmp.PortDate,
             pmp.InstrNameDescr,
             pmp.InstrTicker,
             pmp.BookName,
