@@ -11,8 +11,8 @@ ALTER PROCEDURE dbo.p_GetPerformanceDetails(
   Author:   Lee Kafafian
   Crated:   09/05/2023
   Object:   p_GetPerformanceDetails
-  Example:  EXEC dbo.p_GetPerformanceDetails @BegDate = '01/05/2023', @EndDate = '7/31/2023', @EntityName = 'AMF'
-	          EXEC dbo.p_GetPerformanceDetails @BegDate = '01/05/2023', @EndDate = '1/31/2023', @EntityName = 'AMF', @bAggHolidays = 1
+  Example:  EXEC dbo.p_GetPerformanceDetails @BegDate = '01/05/2023', @EndDate = '8/31/2023', @EntityName = 'AMF'
+	        EXEC dbo.p_GetPerformanceDetails @BegDate = '01/05/2023', @EndDate = '1/31/2023', @EntityName = 'AMF', @bAggHolidays = 1
  */
   
   AS 
@@ -29,6 +29,7 @@ ALTER PROCEDURE dbo.p_GetPerformanceDetails(
         Entity            VARCHAR(500),
         DailyReturn       FLOAT,
 		    DailyReturnNet    FLOAT,
+				DailyRetLogNet    FLOAT,
         PeriodReturn      FLOAT,
 		    PeriodReturnNet   FLOAT,
         bProcessed        BIT DEFAULT 0)
@@ -56,6 +57,27 @@ ALTER PROCEDURE dbo.p_GetPerformanceDetails(
          WHERE pdx.AsOfDate BETWEEN @BegDate AND @EndDate
            AND pdx.Entity = @EntityName      
 
+/*
+        UPDATE pdx
+				   SET pdx.DailyReturn = -0.000253064400071445
+					FROM #tmpPerfReturnData pdx
+				 WHERE pdx.AsOfDate = '2023-01-05'
+				   AND pdx.Entity = 'AMF'
+
+        UPDATE pdx
+				   SET pdx.DailyReturnNet = pdx.DailyReturn * 0.8
+					FROM #tmpPerfReturnData pdx
+				 WHERE pdx.AsOfDate = '2023-01-05'
+				   AND pdx.Entity = 'AMF'
+
+
+        UPDATE pdx
+				   SET pdx.DailyReturn = 0
+					     pdx.DailyReturnNet = 0
+				  FROM #tmpPerfReturnData pdx
+				 WHERE pdx.AsOfDate < '2023-01-05'
+				   AND pdx.Entity = 'AMF' 
+*/
 
         DECLARE @CalcDate           AS DATE
 		    DECLARE @PrevDate           AS DATE
@@ -94,8 +116,8 @@ ALTER PROCEDURE dbo.p_GetPerformanceDetails(
 								 ORDER BY prd.AsOfDate ASC
                 
                 UPDATE prd
-								   SET prd.DailyReturn = prd.DailyReturn + @HolidayRetVal,
-									     prd.DailyReturnNet = prd.DailyReturnNet + @HolidayRetNetVal
+								   SET prd.DailyReturn = (((1 + @HolidayRetVal) * (1 + prd.DailyReturn))- 1),
+									     prd.DailyReturnNet = (((1 + @HolidayRetNetVal) * (1 + prd.DailyReturnNet)) - 1)
 									FROM #tmpPerfReturnData prd
 								 WHERE prd.AsOfDate = @PostHolidayDate
 
@@ -152,12 +174,21 @@ ALTER PROCEDURE dbo.p_GetPerformanceDetails(
 				   AND tdd.IsMktHoliday = 0
 				   AND tdd.AsOfDate NOT IN (SELECT prd.AsOfDate FROM #tmpPerfReturnData prd)
 
+
+				UPDATE tpd
+				   SET tpd.DailyRetLogNet = LOG(1 + tpd.DailyReturnNet)
+					FROM #tmpPerfReturnData tpd 
+
+        
+
+
         SELECT tpd.AsOfDate,
 				       tpd.Entity,
 							 tpd.DailyReturn,
 							 tpd.DailyReturnNet,
 							 tpd.PeriodReturn,
-							 tpd.PeriodReturnNet 
+							 tpd.PeriodReturnNet,
+							 tpd.DailyRetLogNet 
           FROM #tmpPerfReturnData tpd 
          ORDER BY tpd.AsOfDate ASC
 
