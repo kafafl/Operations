@@ -1,4 +1,9 @@
-CREATE PROCEDURE dbo.p_UpdateInsertPerfData(
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE PROCEDURE [dbo].[p_UpdateInsertPerfData](
     @AsOfDate       DATE NULL = DEFAULT,
     @Entity          VARCHAR(255),
     @DailyReturn     FLOAT )
@@ -16,6 +21,8 @@ CREATE PROCEDURE dbo.p_UpdateInsertPerfData(
 
   BEGIN
      
+    SET NOCOUNT ON
+
     IF EXISTS(SELECT TOP 1 * FROM dbo.PerformanceDetails pdx WHERE pdx.AsOfDate = @AsOfDate AND pdx.Entity = @Entity)
       BEGIN
         UPDATE pdx
@@ -35,10 +42,6 @@ CREATE PROCEDURE dbo.p_UpdateInsertPerfData(
                @DailyReturn
       END
 
-  
+    SET NOCOUNT OFF
   END
-
-GO
-
-GRANT EXECUTE ON dbo.p_UpdateInsertPerfData TO PUBLIC
 GO

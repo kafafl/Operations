@@ -14,3 +14,13 @@ CREATE TABLE dbo.PerformanceDetails(
 
 GRANT SELECT, INSERT, UPDATE ON dbo.PerformanceDetails TO PUBLIC
 GO
+
+
+ALTER TABLE dbo.PerformanceDetails 
+            ADD CreatedBy                VARCHAR(50)    CONSTRAINT DF_PerfDetails_CreatedBy DEFAULT(SUSER_NAME()),
+                CreatedOn                DATETIME       CONSTRAINT DF_perfDetails_CreatedOn DEFAULT(GETDATE()),
+                UpdatedBy                VARCHAR(50) NULL,
+                UpdatedOn                DATETIME NULL
+                GO
+
+

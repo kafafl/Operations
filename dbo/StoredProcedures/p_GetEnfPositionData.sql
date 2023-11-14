@@ -187,6 +187,7 @@ CREATE PROCEDURE dbo.p_GetEnfPositionData(
 	     WHERE ABS(tsp.Quantity) != 0
          AND CHARINDEX('FX Spot', tsp.InstDescr) = 0
 		     AND CHARINDEX('FX Forward', tsp.InstDescr) = 0
+         AND (CHARINDEX('SEttled Cash', tsp.InstDescr) = 0)
 	     ORDER BY tsp.InstDescr
 	END
 
