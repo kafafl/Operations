@@ -24,3 +24,25 @@ ALTER TABLE dbo.PerformanceDetails
                 GO
 
 
+CREATE TRIGGER [dbo].[trgUpdateOnePerfDetails] 
+  ON dbo.PerformanceDetails
+  AFTER UPDATE
+  AS 
+    BEGIN
+    
+      SET NOCOUNT ON
+
+      DECLARE @ts DATETIME
+      DECLARE @user AS VARCHAR(255)
+
+      SET @ts = CURRENT_TIMESTAMP
+      SET @user = SUSER_NAME()
+
+      UPDATE epd 
+         SET UpdatedOn = @ts,
+             UpdatedBy = @user
+        FROM [dbo].[PerformanceDetails] AS epd
+       INNER JOIN inserted AS i 
+          ON epd.PerfId = i.PerfId;
+    END
+GO
