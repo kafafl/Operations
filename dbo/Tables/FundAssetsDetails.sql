@@ -9,7 +9,7 @@ CREATE TABLE dbo.FundAssetsDetails(
   AsOfDate      DATE,
   Entity        VARCHAR(255),
   AssetValue    FLOAT,
-  PerfNote      VARCHAR(1000),
+  AssetNote      VARCHAR(1000),
   CreatedBy     VARCHAR(50)    CONSTRAINT DF_FundAssets_CreatedBy DEFAULT(SUSER_NAME()),
   CreatedOn     DATETIME       CONSTRAINT DF_FundAssets_CreatedOn DEFAULT(GETDATE()),
   UpdatedBy     VARCHAR(50) NULL,
@@ -42,3 +42,4 @@ GO
 
 GRANT SELECT, INSERT, UPDATE ON dbo.FundAssetsDetails TO PUBLIC
 GO
+/* SOME COMMENT   - FORCE FOR SOURCE  */
