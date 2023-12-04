@@ -10,9 +10,9 @@ CREATE PROCEDURE [dbo].[p_UpdateInsertPerfData](
  
  
  /*
-  Author: Lee Kafafian
-  Crated: 09/05/2023
-  Object: p_UpdateInsertPerfData
+  Author:   Lee Kafafian
+  Crated:   09/05/2023
+  Object:   p_UpdateInsertPerfData
   Example:  EXEC dbo.p_UpdateInsertPerfData @AsOfDate = '01/02/2023', @Entity = 'AMF', @DailyReturn = 0.01
 
  */
