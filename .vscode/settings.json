@@ -1,4 +1,19 @@
 {
     "azureAutomation.directory.basePath": "c:\\Users\\LeeKafafian",
-    "sqltools.connections": []
+    "sqltools.connections": [
+        {
+            "mssqlOptions": {
+                "appName": "SQLTools",
+                "useUTC": true,
+                "encrypt": true
+            },
+            "previewLimit": 50,
+            "server": "allostery-dev.database.windows.net",
+            "port": 1433,
+            "driver": "MSSQL",
+            "username": "svcOperations",
+            "database": "Operations",
+            "name": "Operations"
+        }
+    ]
 }

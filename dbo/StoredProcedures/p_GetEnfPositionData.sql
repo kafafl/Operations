@@ -1,4 +1,7 @@
-CREATE PROCEDURE dbo.p_GetEnfPositionData(
+USE Operations
+GO
+
+ALTER PROCEDURE dbo.p_GetEnfPositionData(
   @AsOfDate   DATE NULL = DEFAULT,
   @ResultSet  INT = 1,
   @EquitiesOnly BIT = 0)
@@ -7,7 +10,8 @@ CREATE PROCEDURE dbo.p_GetEnfPositionData(
   Author: Lee Kafafian
   Crated: 09/21/2023
   Object: p_GetEnfPositionData
-  Example:  EXEC dbo.p_GetEnfPositionData @AsOfDate = '09/21/2023', @ResultSet = 1
+  Example:  EXEC dbo.p_GetEnfPositionData @AsOfDate = '12/12/2023', @ResultSet = 1
+            EXEC dbo.p_GetEnfPositionData @AsOfDate = '12/29/2023', @ResultSet = 1, @EquitiesOnly = 1
  */
   
  AS 
@@ -122,7 +126,7 @@ CREATE PROCEDURE dbo.p_GetEnfPositionData(
             epd.Delta,
             epd.DeltaAdjMV,
             epd.DeltaExp,
-			      epd.LongShort,
+            epd.LongShort,
             epd.LongMV,
             epd.ShortMv,
             epd.InstrTypeCode,
@@ -131,26 +135,35 @@ CREATE PROCEDURE dbo.p_GetEnfPositionData(
       WHERE epd.AsOfDate = @AsOfDate
 
         
+/*  UPDATE 'ABVX UNDERLYING'  */
+    UPDATE tsp
+       SET tsp.UnderlyBBYellowKey = tsp.BBYellowKey
+      FROM #tmpPositions tsp
+	   WHERE CHARINDEX('ABVX US', tsp.BBYellowKey) != 0
 
 /*  UPDATE 'MSA14568' with known BookName change  */
     UPDATE tsp
        SET tsp.BookName = 'Equity Hedge - Core'
       FROM #tmpPositions tsp
-	 WHERE CHARINDEX('MSA14568', tsp.InstDescr) != 0
+	   WHERE CHARINDEX('MSA14568', tsp.InstDescr) != 0
 
 
     IF @EquitiesOnly = 1
       BEGIN
         DELETE tsp           
           FROM #tmpPositions tsp
-          JOIN dbo.Instruments iis
-            ON tsp.InstDescr = iis.InstrNameDescr
-	       WHERE iis.InstrType != 'Equity'
-
+	       WHERE tsp.InstrType != 'Equity'
       END
+
 
   IF @ResultSet = 1
     BEGIN
+      DELETE tsp
+        FROM #tmpPositions tsp
+       WHERE ABS(ROUND(tsp.Quantity, 0)) = 0
+	END
+
+
       SELECT tsp.AsOfDate,
              tsp.FundShortName,
              tsp.StratName,
@@ -184,12 +197,18 @@ CREATE PROCEDURE dbo.p_GetEnfPositionData(
              tsp.InstrTypeCode,
              tsp.InstrTypeUnder
         FROM #tmpPositions tsp
-	     WHERE ABS(tsp.Quantity) != 0
+	     WHERE 1 = 1
          AND CHARINDEX('FX Spot', tsp.InstDescr) = 0
 		     AND CHARINDEX('FX Forward', tsp.InstDescr) = 0
-         AND (CHARINDEX('SEttled Cash', tsp.InstDescr) = 0)
-	     ORDER BY tsp.InstDescr
-	END
+         AND (CHARINDEX('Settled Cash', tsp.InstDescr) = 0)
+	     ORDER BY tsp.AsOfDate,
+             tsp.FundShortName,
+             CASE WHEN RTRIM(LTRIM(tsp.StratName)) = '' THEN 'zzz' ELSE tsp.StratName END,
+             CASE WHEN RTRIM(LTRIM(tsp.BookName)) = '' THEN 'zzz' ELSE tsp.BookName END,
+             tsp.InstDescr,
+             tsp.BBYellowKey,
+             tsp.UnderlyBBYellowKey
+
 
    SET NOCOUNT OFF
 

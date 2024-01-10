@@ -1,7 +1,7 @@
 USE Operations
 GO
 
-CREATE PROCEDURE dbo.p_GetSecDataDetails(
+ALTER PROCEDURE dbo.p_GetSecDataDetails(
     @AsOfDate   DATE NULL = DEFAULT )
  
  /*
@@ -193,6 +193,13 @@ CREATE PROCEDURE dbo.p_GetSecDataDetails(
            tsd.UnderlyBBYellow = 'ELEV US Equity'
       FROM #tmpSecData tsd
      WHERE tsd.InstDescr = 'ELEVATION ONCOLOGY ORD - Warrant'
+
+    UPDATE tsd
+       SET tsd.UnderlyBBYellow = tsd.BBYellowKey
+      FROM #tmpSecData tsd
+     WHERE CHARINDEX('ABVX US', tsd.BBYellowKey) !=0
+
+
 
 
      SELECT AsOfDate,
