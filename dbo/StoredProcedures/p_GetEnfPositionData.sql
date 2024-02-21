@@ -10,7 +10,7 @@ ALTER PROCEDURE dbo.p_GetEnfPositionData(
   Author: Lee Kafafian
   Crated: 09/21/2023
   Object: p_GetEnfPositionData
-  Example:  EXEC dbo.p_GetEnfPositionData @AsOfDate = '12/12/2023', @ResultSet = 1
+  Example:  EXEC dbo.p_GetEnfPositionData @AsOfDate = '01/12/2024', @ResultSet = 1
             EXEC dbo.p_GetEnfPositionData @AsOfDate = '12/29/2023', @ResultSet = 1, @EquitiesOnly = 1
  */
   
@@ -21,6 +21,7 @@ ALTER PROCEDURE dbo.p_GetEnfPositionData(
    SET NOCOUNT ON
 
     DECLARE @AsOfDateCheck AS DATE
+    DECLARE @AsOfPrevBusDate AS DATE
 
     SELECT TOP 1 @AsOfDateCheck = epd.AsOfDate FROM dbo.EnfPositionDetails epd ORDER BY epd.AsOfDate DESC
 
@@ -29,6 +30,8 @@ ALTER PROCEDURE dbo.p_GetEnfPositionData(
           SELECT @AsOfDate = @AsOfDateCheck
         END
 
+    SELECT TOP 1 @AsOfPrevBusDate = epd.AsOfDate FROM dbo.EnfPositionDetails epd WHERE epd.AsOfDate < @AsOfDate ORDER BY epd.AsOfDate DESC
+    
 
     CREATE TABLE #tmpPositions(  
       [AsOfDate]             DATE          NOT NULL,
@@ -63,7 +66,8 @@ ALTER PROCEDURE dbo.p_GetEnfPositionData(
       [LongMV]               FLOAT (53) NULL,
       [ShortMV]              FLOAT (53) NULL,
       [InstrTypeCode]        VARCHAR (255) NULL,
-      [InstrTypeUnder]       VARCHAR (255) NULL)
+      [InstrTypeUnder]       VARCHAR (255) NULL,
+      [PrevBusDayNMV]        FLOAT (53) NULL)
 
 
      INSERT INTO #tmpPositions(
@@ -135,6 +139,17 @@ ALTER PROCEDURE dbo.p_GetEnfPositionData(
       WHERE epd.AsOfDate = @AsOfDate
 
         
+
+   UPDATE tpx
+      SET tpx.PrevBusDayNMV = 0
+     FROM #tmpPositions tpx
+     JOIN dbo.EnfPositionDetails epx
+       ON tpx.BBYellowKey = epx.BBYellowKey
+      AND tpx.BookName = epx.BookName
+      AND tpx.StratName = epx.StratName
+      AND tpx.InstDescr = epx.InstDescr
+    WHERE epx.AsOfDate = @PrevBusDayNMV
+
 /*  UPDATE 'ABVX UNDERLYING'  */
     UPDATE tsp
        SET tsp.UnderlyBBYellowKey = tsp.BBYellowKey
@@ -161,7 +176,7 @@ ALTER PROCEDURE dbo.p_GetEnfPositionData(
       DELETE tsp
         FROM #tmpPositions tsp
        WHERE ABS(ROUND(tsp.Quantity, 0)) = 0
-	END
+	  END
 
 
       SELECT tsp.AsOfDate,
@@ -195,7 +210,8 @@ ALTER PROCEDURE dbo.p_GetEnfPositionData(
              tsp.ShortMV,
 			       tsp.GrExpOfGLNav AS GrossExp,
              tsp.InstrTypeCode,
-             tsp.InstrTypeUnder
+             tsp.InstrTypeUnder,
+             tsp.PrevBusDayNMV
         FROM #tmpPositions tsp
 	     WHERE 1 = 1
          AND CHARINDEX('FX Spot', tsp.InstDescr) = 0
