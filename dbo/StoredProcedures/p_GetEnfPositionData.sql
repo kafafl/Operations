@@ -1,7 +1,4 @@
-USE Operations
-GO
-
-ALTER PROCEDURE dbo.p_GetEnfPositionData(
+CREATE PROCEDURE [dbo].[p_GetEnfPositionData](
   @AsOfDate   DATE NULL = DEFAULT,
   @ResultSet  INT = 1,
   @EquitiesOnly BIT = 0)
@@ -10,7 +7,7 @@ ALTER PROCEDURE dbo.p_GetEnfPositionData(
   Author: Lee Kafafian
   Crated: 09/21/2023
   Object: p_GetEnfPositionData
-  Example:  EXEC dbo.p_GetEnfPositionData @AsOfDate = '01/12/2024', @ResultSet = 1
+  Example:  EXEC dbo.p_GetEnfPositionData @AsOfDate = '03/28/2024', @ResultSet = 1
             EXEC dbo.p_GetEnfPositionData @AsOfDate = '12/29/2023', @ResultSet = 1, @EquitiesOnly = 1
  */
   
@@ -138,17 +135,69 @@ ALTER PROCEDURE dbo.p_GetEnfPositionData(
        FROM dbo.EnfPositionDetails epd
       WHERE epd.AsOfDate = @AsOfDate
 
-        
 
-   UPDATE tpx
-      SET tpx.PrevBusDayNMV = 0
-     FROM #tmpPositions tpx
-     JOIN dbo.EnfPositionDetails epx
-       ON tpx.BBYellowKey = epx.BBYellowKey
-      AND tpx.BookName = epx.BookName
-      AND tpx.StratName = epx.StratName
-      AND tpx.InstDescr = epx.InstDescr
-    WHERE epx.AsOfDate = @PrevBusDayNMV
+     UPDATE tsp
+        SET tsp.InstDescr = RTRIM(LTRIM(SUBSTRING(tsp.InstDescr, 2, LEN(tsp.InstDescr))))
+       FROM #tmpPositions tsp
+      WHERE LEFT(tsp.InstDescr, 1) = '"'
+
+     UPDATE tsp
+        SET tsp.InstDescr = RTRIM(LTRIM (SUBSTRING(tsp.InstDescr, 1, LEN(tsp.InstDescr) - 1)))
+       FROM #tmpPositions tsp
+      WHERE RIGHT(tsp.InstDescr, 1) = '"'     
+
+  /* UPDATE FROM PRIOR DAY CLOSE DATA  */        
+     UPDATE tpx
+        SET tpx.PrevBusDayNMV = CASE WHEN epx.InstrType IN ('Index') THEN epx.DeltaAdjMV ELSE epx.NetMarketValue END
+       FROM #tmpPositions tpx
+       JOIN dbo.EnfPositionDetails epx
+         ON tpx.BBYellowKey = epx.BBYellowKey
+        AND tpx.BookName = epx.BookName
+        AND tpx.StratName = epx.StratName
+        AND tpx.InstDescr = epx.InstDescr
+        AND CASE WHEN tpx.Quantity != 0 THEN 'Open' ELSE 'Closed' END = CASE WHEN epx.Quantity != 0 THEN 'Open' ELSE 'Closed' END
+      WHERE epx.AsOfDate = @AsOfPrevBusDate
+
+  /* UPDATE FROM PRIOR DAY CLOSE DATA  */        
+     UPDATE tpx
+        SET tpx.PrevBusDayNMV = CASE WHEN epx.InstrType IN ('Index') THEN epx.DeltaAdjMV ELSE epx.NetMarketValue END
+       FROM #tmpPositions tpx
+       JOIN dbo.EnfPositionDetails epx
+         ON tpx.BBYellowKey = epx.BBYellowKey
+        AND tpx.BookName = epx.BookName
+        AND tpx.StratName = epx.StratName
+        AND tpx.InstDescr = epx.InstDescr
+        AND CASE WHEN tpx.Quantity != 0 THEN 'Open' ELSE 'Closed' END = CASE WHEN epx.Quantity != 0 THEN 'Open' ELSE 'Closed' END
+      WHERE epx.AsOfDate = @AsOfDate
+        AND tpx.PrevBusDayNMV = 0
+
+
+/*  ADDED AFTER BOOKING CHANGES WERE MADE TO WARRANTS  */
+/*  UPDATE 'BIOMX ORD'  */
+    UPDATE tsp
+       SET tsp.UnderlyBBYellowKey = 'PHGE US Equity'
+      FROM #tmpPositions tsp
+	   WHERE CHARINDEX('BIOMX ORD - Private ', tsp.InstDescr) != 0
+
+/*  UPDATE 'BIOMX ORD'  */
+    UPDATE tsp
+       SET tsp.UnderlyBBYellowKey = 'GOSS US Equity'
+      FROM #tmpPositions tsp
+	   WHERE CHARINDEX('GOSSAMER BIO ORD - Private', tsp.InstDescr) != 0
+
+/*  UPDATE 'BIOMX ORD'  */
+    UPDATE tsp
+       SET tsp.UnderlyBBYellowKey = 'LXEO US Equity'
+      FROM #tmpPositions tsp
+	   WHERE CHARINDEX('LEXEO THERAPEUTICS ORD - Private', tsp.InstDescr) != 0
+
+/*  UPDATE 'BIOMX ORD'  */
+    UPDATE tsp
+       SET tsp.UnderlyBBYellowKey = 'MTEM US Equity'
+      FROM #tmpPositions tsp
+	   WHERE CHARINDEX('MOLECULAR TEMPLATES - Private', tsp.InstDescr) != 0
+
+
 
 /*  UPDATE 'ABVX UNDERLYING'  */
     UPDATE tsp
@@ -229,7 +278,8 @@ ALTER PROCEDURE dbo.p_GetEnfPositionData(
    SET NOCOUNT OFF
 
    END
-   GO
+GO
 
    GRANT EXECUTE ON dbo.p_GetEnfPositionData TO PUBLIC
    GO
+

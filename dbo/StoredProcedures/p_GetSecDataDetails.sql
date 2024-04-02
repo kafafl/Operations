@@ -1,14 +1,16 @@
-USE Operations
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE dbo.p_GetSecDataDetails(
+ALTER PROCEDURE [dbo].[p_GetSecDataDetails](
     @AsOfDate   DATE NULL = DEFAULT )
  
  /*
   Author:   Lee Kafafian
   Crated:   11/27/2023
   Object:   p_GetSecDataDetails
-  Example:  EXEC dbo.p_GetSecDataDetails @AsOfDate = '11/27/2023'
+  Example:  EXEC dbo.p_GetSecDataDetails @AsOfDate = '03/22/2024'
 
  */
   
@@ -79,7 +81,19 @@ ALTER PROCEDURE dbo.p_GetSecDataDetails(
              epf.UnderlyBBYellowKey
 
 
-/*  NORMALIZE THE DATA FOR THE SPREADSHEET  */
+     UPDATE tsd
+        SET tsd.InstDescr = RTRIM(LTRIM(SUBSTRING(tsd.InstDescr, 2, LEN(tsd.InstDescr))))
+       FROM #tmpSecData tsd
+      WHERE LEFT(tsd.InstDescr, 1) = '"'
+
+     UPDATE tsd
+        SET tsd.InstDescr = RTRIM(LTRIM (SUBSTRING(tsd.InstDescr, 1, LEN(tsd.InstDescr) - 1)))
+       FROM #tmpSecData tsd
+      WHERE RIGHT(tsd.InstDescr, 1) = '"'   
+
+
+
+/*  NORMALIZE THE DATA [STRATEGY] FOR THE SPREADSHEET  */
     UPDATE tsd
        SET tsd.StratName = 'US Alpha Longs',
            tsd.bProcessed = 1
@@ -127,7 +141,6 @@ ALTER PROCEDURE dbo.p_GetSecDataDetails(
      WHERE tsd.BookName = 'Equity Hedge - Tail'
        AND tsd.bProcessed = 0
 
-
     UPDATE tsd
        SET tsd.StratName = 'US Core Biotech Shorts',
            tsd.bProcessed = 1
@@ -152,6 +165,7 @@ ALTER PROCEDURE dbo.p_GetSecDataDetails(
       FROM #tmpSecData tsd
      WHERE tsd.InstDescr = 'MSA14568'
 
+/*  NORMALIZE THE PRIVATE INSTRUMENTS */
     UPDATE tsd
        SET tsd.BBYellowKey = 'GOSS US Equity',
            tsd.UnderlyBBYellow = 'GOSS US Equity'
@@ -183,6 +197,19 @@ ALTER PROCEDURE dbo.p_GetSecDataDetails(
      WHERE tsd.InstDescr = 'ZURA Private'
 
     UPDATE tsd
+       SET tsd.BBYellowKey = 'PHGE US Equity',
+           tsd.UnderlyBBYellow = 'PHGE US Equity'
+      FROM #tmpSecData tsd
+     WHERE tsd.InstDescr = 'BIOMX ORD - Private'
+
+    UPDATE tsd
+       SET tsd.BBYellowKey = 'LXEO US Equity',
+           tsd.UnderlyBBYellow = 'LXEO US Equity'
+      FROM #tmpSecData tsd
+     WHERE tsd.InstDescr = 'LEXEO THERAPEUTICS ORD - Private'
+
+/*  NORMALIZE THE WARRANTS INSTRUMENTS */
+    UPDATE tsd
        SET tsd.BBYellowKey = 'GOSS Warrant',
            tsd.UnderlyBBYellow = 'GOSS US Equity'
       FROM #tmpSecData tsd
@@ -195,11 +222,16 @@ ALTER PROCEDURE dbo.p_GetSecDataDetails(
      WHERE tsd.InstDescr = 'ELEVATION ONCOLOGY ORD - Warrant'
 
     UPDATE tsd
+       SET tsd.BBYellowKey = 'BIOMX Warrant',
+           tsd.UnderlyBBYellow = 'PHGE US Equity'
+      FROM #tmpSecData tsd
+     WHERE tsd.InstDescr = 'BIOMX ORD - Warrant'
+
+/*  ABVX US UPDATE UNDERLYING  */
+    UPDATE tsd
        SET tsd.UnderlyBBYellow = tsd.BBYellowKey
       FROM #tmpSecData tsd
-     WHERE CHARINDEX('ABVX US', tsd.BBYellowKey) !=0
-
-
+     WHERE CHARINDEX('ABVX US', tsd.BBYellowKey) != 0
 
 
      SELECT AsOfDate,
@@ -223,7 +255,8 @@ ALTER PROCEDURE dbo.p_GetSecDataDetails(
    SET NOCOUNT OFF
 
    END
-   GO
+GO
 
-   GRANT EXECUTE ON dbo.p_GetSecDataDetails TO PUBLIC
-   GO
+
+GRANT EXECUTE ON dbo.p_GetSecDataDetails TO PUBLIC
+GO
