@@ -10,10 +10,12 @@
             "previewLimit": 50,
             "server": "allostery-dev.database.windows.net",
             "port": 1433,
+            "askForPassword": true,
             "driver": "MSSQL",
             "username": "svcOperations",
             "database": "Operations",
-            "name": "Operations"
+            "name": "Operations",
+            "group": "Operations"
         }
     ]
 }
