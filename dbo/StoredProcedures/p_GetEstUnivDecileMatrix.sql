@@ -37,7 +37,7 @@ CREATE PROCEDURE dbo.p_GetEstUnivDecileMatrix(
         BEGIN
           SELECT TOP 1 @AsOfDate = reu.AsOfDate FROM dbo.RiskEstUniverse reu ORDER BY reu.AsOfDate DESC
         END
-        SELECT TOP 1 @JobRef = reu.JobReference FROM dbo.RiskEstUniverse reu WHERE @AsOfDate = @AsOfDate ORDER BY reu.CreatedOn DESC
+        SELECT TOP 1 @JobRef = reu.JobReference FROM dbo.RiskEstUniverse reu WHERE reu.AsOfDate = @AsOfDate ORDER BY reu.CreatedOn DESC
 
         INSERT INTO #tmpFactorList(
                FactorName)
