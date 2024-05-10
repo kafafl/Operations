@@ -43,13 +43,13 @@ CREATE PROCEDURE dbo.p_RunPortfolioMonitor(
 
       IF @AsOfDate IS NULL
         BEGIN
-          SELECT TOP 1 @AsOfDate = CAST(epd.AsOfDate AS DATE) FROM dbo.EnfPositionDetails epd WHERE 1 = 1  ORDER BY epd.AsOfDate DESC
+          SELECT TOP 1 @AsOfDate = CAST(epd.AsOfDate AS DATE) FROM dbo.EnfPositionDetails epd WHERE 1 = 1 ORDER BY epd.AsOfDate DESC
         END
 
       IF @PrevDate IS NULL
         BEGIN
-          SELECT TOP 1 @PrevDate = epd.AsOfDate FROM dbo.EnfPositionDetails epd WHERE 1 = 1  AND epd.AsOfDate < @AsOfDate ORDER BY epd.AsOfDate DESC
-          --SELECT @PrevDate = DATEADD(dd, -1, @AsOfDate)
+          SELECT TOP 1 @PrevDate = epd.AsOfDate FROM dbo.EnfPositionDetails epd WHERE 1 = 1 AND epd.AsOfDate < @AsOfDate ORDER BY epd.AsOfDate DESC
+          SELECT @PrevDate = DATEADD(dd, -1, @AsOfDate)
         END
 
 
