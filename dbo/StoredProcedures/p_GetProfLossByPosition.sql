@@ -3,13 +3,15 @@ CREATE PROCEDURE [dbo].[p_GetProfLossByPosition](
   @iTopNCount     INT = 20,
   @iRst           INT = 1,
   @bIncludeOpt    BIT = 0,
-  @iHierarchy     INT = 1)
+  @iHierarchy     INT = 1,
+  @iOrder         INT = 0)
 
    /*
   Author: Lee Kafafian
   Crated: 09/21/2023
   Object: p_GetProfLossByPosition
-  Example:  EXEC dbo.p_GetProfLossByPosition @AsOfDate = '04/30/2024', @iTopNCount = 20, @iRst = 3, @iHierarchy = 3
+  Example:  EXEC dbo.p_GetProfLossByPosition @AsOfDate = '04/30/2024', @iTopNCount = 400, @iRst = 1, @iHierarchy = 1, @iOrder = 2
+            EXEC dbo.p_GetProfLossByPosition @AsOfDate = '5/24/2024', @iTopNCount = 25, @iRst = 3, @iHierarchy = 1, @iOrder = 1
             EXEC dbo.p_GetProfLossByPosition @AsOfDate = '12/29/2023'
  */
   
@@ -77,7 +79,7 @@ CREATE PROCEDURE [dbo].[p_GetProfLossByPosition](
       [InstrType]                VARCHAR (255) NULL,
       [DlyPnlUsd]                FLOAT (53)    NULL,
       [DlyPnlOfNav]              FLOAT (53)    NULL,
-      [MtdPnlUsd]	             FLOAT (53)    NULL,
+      [MtdPnlUsd]	               FLOAT (53)    NULL,
       [MtdPnlOfNav]              FLOAT (53)    NULL,
       [YtdPnlUsd]                FLOAT (53)    NULL,
       [YtdPnlOfNav]              FLOAT (53)    NULL,
@@ -118,7 +120,7 @@ CREATE PROCEDURE [dbo].[p_GetProfLossByPosition](
             InstrTypeCode,
             InstrTypeUnder,
             PrevBusDayNMV)
-       EXEC dbo.p_GetEnfPositionData @AsOfDate = @AsOfDate
+       EXEC dbo.p_GetEnfPositionData @AsOfDate = @AsOfDate, @ResultSet = 0
 
     --SELECT * FROM #tmpProfLossPos tps WHERE tps.BookName = '' AND tps.StratName = ''
     DELETE tps FROM #tmpProfLossPos tps WHERE tps.BookName = '' AND tps.StratName = ''
@@ -241,11 +243,27 @@ CREATE PROCEDURE [dbo].[p_GetProfLossByPosition](
                BookName,
                InstDescr,
                BBYellowKey
-         ORDER BY CASE @iRst
+         HAVING CASE @iRst
                WHEN 1 THEN SUM(DlyPnlUsd)
                WHEN 2 THEN SUM(MtdPnlUsd)
                WHEN 3 THEN SUM(YtdPnlUsd)
-               WHEN 4 THEN SUM(ItdPnlUsd) END DESC
+               WHEN 4 THEN SUM(ItdPnlUsd) END != 0
+         ORDER BY CASE @iOrder 
+                    WHEN 1 THEN
+                      CASE @iRst
+                        WHEN 1 THEN SUM(DlyPnlUsd)
+                        WHEN 2 THEN SUM(MtdPnlUsd)
+                        WHEN 3 THEN SUM(YtdPnlUsd)
+                        WHEN 4 THEN SUM(ItdPnlUsd) END
+                      END DESC,
+                  CASE @iOrder 
+                    WHEN 2 THEN
+                      CASE @iRst
+                        WHEN 1 THEN SUM(DlyPnlUsd)
+                        WHEN 2 THEN SUM(MtdPnlUsd)
+                        WHEN 3 THEN SUM(YtdPnlUsd)
+                        WHEN 4 THEN SUM(ItdPnlUsd) END
+                      END ASC 
       END
 
     IF @iHierarchy = 2
@@ -266,11 +284,27 @@ CREATE PROCEDURE [dbo].[p_GetProfLossByPosition](
                StratName,
                InstDescr,
                BBYellowKey
-         ORDER BY CASE @iRst
+        HAVING CASE @iRst
                WHEN 1 THEN SUM(DlyPnlUsd)
                WHEN 2 THEN SUM(MtdPnlUsd)
                WHEN 3 THEN SUM(YtdPnlUsd)
-               WHEN 4 THEN SUM(ItdPnlUsd) END DESC
+               WHEN 4 THEN SUM(ItdPnlUsd) END != 0
+         ORDER BY CASE @iOrder 
+                    WHEN 1 THEN
+                      CASE @iRst
+                        WHEN 1 THEN SUM(DlyPnlUsd)
+                        WHEN 2 THEN SUM(MtdPnlUsd)
+                        WHEN 3 THEN SUM(YtdPnlUsd)
+                        WHEN 4 THEN SUM(ItdPnlUsd) END
+                      END DESC,
+                  CASE @iOrder 
+                    WHEN 2 THEN
+                      CASE @iRst
+                        WHEN 1 THEN SUM(DlyPnlUsd)
+                        WHEN 2 THEN SUM(MtdPnlUsd)
+                        WHEN 3 THEN SUM(YtdPnlUsd)
+                        WHEN 4 THEN SUM(ItdPnlUsd) END
+                      END ASC 
       END
 
     IF @iHierarchy = 3
@@ -290,11 +324,27 @@ CREATE PROCEDURE [dbo].[p_GetProfLossByPosition](
                FundShortName,
                InstDescr,
                BBYellowKey
-         ORDER BY CASE @iRst
+        HAVING CASE @iRst
                WHEN 1 THEN SUM(DlyPnlUsd)
                WHEN 2 THEN SUM(MtdPnlUsd)
                WHEN 3 THEN SUM(YtdPnlUsd)
-               WHEN 4 THEN SUM(ItdPnlUsd) END DESC
+               WHEN 4 THEN SUM(ItdPnlUsd) END != 0
+         ORDER BY CASE @iOrder 
+                    WHEN 1 THEN
+                      CASE @iRst
+                        WHEN 1 THEN SUM(DlyPnlUsd)
+                        WHEN 2 THEN SUM(MtdPnlUsd)
+                        WHEN 3 THEN SUM(YtdPnlUsd)
+                        WHEN 4 THEN SUM(ItdPnlUsd) END
+                      END DESC,
+                  CASE @iOrder 
+                    WHEN 2 THEN
+                      CASE @iRst
+                        WHEN 1 THEN SUM(DlyPnlUsd)
+                        WHEN 2 THEN SUM(MtdPnlUsd)
+                        WHEN 3 THEN SUM(YtdPnlUsd)
+                        WHEN 4 THEN SUM(ItdPnlUsd) END
+                      END ASC 
       END
 
 
