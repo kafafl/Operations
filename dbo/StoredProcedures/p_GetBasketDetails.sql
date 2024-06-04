@@ -2,7 +2,7 @@ USE Operations
 GO
 
 ALTER PROCEDURE dbo.p_GetBasketDetails(
-    @BasketName VARCHAR(255) ,
+    @BasketName VARCHAR(255),
     @AsOfDate   DATE NULL = DEFAULT )
  
  /*
@@ -46,10 +46,10 @@ ALTER PROCEDURE dbo.p_GetBasketDetails(
             tbk.ConstName,
             MAX(tbk.UpdateDate) AS UpdateDate
        FROM #tmpBasket tbk
-     HAVING MAX(tbk.UpdateDate) = MAX(tbk.UpdateDate)
       GROUP BY tbk.BasketName,
             tbk.ConstName
-
+     HAVING MAX(tbk.UpdateDate) = MAX(tbk.UpdateDate)
+     
    SET NOCOUNT OFF
 
    END

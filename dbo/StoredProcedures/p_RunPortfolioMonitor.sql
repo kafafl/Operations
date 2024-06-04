@@ -8,11 +8,12 @@ CREATE PROCEDURE dbo.p_RunPortfolioMonitor(
   Crated:   09/25/2023
   Object:   p_RunPortfolioMonitor
   Example:  EXEC dbo.p_RunPortfolioMonitor
-            EXEC dbo.p_RunPortfolioMonitor @AsOfDate = '03/25/2024'
+            EXEC dbo.p_RunPortfolioMonitor @AsOfDate = '05/31/2024', @rstOutput = 4
             EXEC dbo.p_RunPortfolioMonitor @AsOfDate = '03/25/2024', @PrevDate = '03/19/2024'
             EXEC dbo.p_RunPortfolioMonitor @rstOutput = 1
             EXEC dbo.p_RunPortfolioMonitor @rstOutput = 2
             EXEC dbo.p_RunPortfolioMonitor @rstOutput = 3
+            EXEC dbo.p_RunPortfolioMonitor @rstOutput = 4
             
  */
   
@@ -193,6 +194,21 @@ CREATE PROCEDURE dbo.p_RunPortfolioMonitor(
           FROM #tmpPortfolio tpo 
          WHERE tpo.sGUID = @PrevUID
            AND tpo.Ticker NOT IN (SELECT tpx.Ticker FROM #tmpPortfolio tpx WHERE tpx.sGUID = @AsOfUID)
+         ORDER BY tpo.AsOfDate, tpo.Strategy, tpo.Substrategy
+      END
+
+    IF @rstOutput = 4
+      BEGIN
+        SELECT @AsOfDate AS AsOfDate,
+               tpo.Strategy,
+               tpo.Substrategy,
+               tpo.Ticker,
+               tpo.Shares,
+               tpo.FirstDate,
+               tpo.ShareChange,
+               'Names in of the AMF Portfolio' AS [Status]
+          FROM #tmpPortfolio tpo 
+         WHERE tpo.sGUID = @AsOfUID
          ORDER BY tpo.AsOfDate, tpo.Strategy, tpo.Substrategy
       END
 
