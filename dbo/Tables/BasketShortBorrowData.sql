@@ -1,43 +1,28 @@
-CREATE PROCEDURE dbo.p_UpdateInsertMspbBorrowData(
-    @strTicker             VARCHAR(255),
-    @SecName               VARCHAR(255),
-    @Country               VARCHAR(255),
-    @Availability          FLOAT,
-    @Rate                  FLOAT,
-    @RateType              VARCHAR(255),
-    @Price                 FLOAT)
- 
- 
- /*
-  Author:   Lee Kafafian
-  Crated:   05/16/2024
-  Object:   p_UpdateInsertMspbBorrowData
-  Example:  EXEC dbo.p_UpdateInsertMspbBorrowData @strBbgTicker = '02/19/2024', @SecName = 'ABCD US Equity', @MktCap = 1.00, @Price = 1, @TotRetYtd = 1, @RevenueT12M = 1, @EPS = 1
- */
-  
- AS 
-  BEGIN
-    SET NOCOUNT ON
-
-        INSERT INTO dbo.BasketShortBorrowData(
-               MspbTicker,
-               SecName,
-               Country,
-               vAvailability,
-               Rate,
-               RateType,
-               ClsPrice) 
-        SELECT @strTicker,
-               @SecName,
-               @Country,
-               @Availability,
-               @Rate,
-               @RateType,
-               @Price
-
-    SET NOCOUNT OFF
-  END
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
 GO
 
-GRANT EXECUTE ON dbo.p_UpdateInsertMspbBorrowData TO PUBLIC
+CREATE TABLE [dbo].[BasketShortBorrowData](
+	[iId] [bigint] IDENTITY(1,1) NOT NULL,
+	[MspbTicker] [varchar](255) NOT NULL,
+	[SecName] [varchar](255) NOT NULL,
+	[Country] [varchar](255) NOT NULL,
+	[vAvailability] [varchar](255) NULL,
+	[Rate] [float] NULL,
+	[RateType] [varchar](255) NULL,
+	[ClsPrice] [float] NULL,
+	[SysStartTime] [datetime2](7) GENERATED ALWAYS AS ROW START NOT NULL,
+	[SysEndTime] [datetime2](7) GENERATED ALWAYS AS ROW END NOT NULL,
+	PERIOD FOR SYSTEM_TIME ([SysStartTime], [SysEndTime])
+) ON [PRIMARY]
+WITH
+(
+SYSTEM_VERSIONING = ON (HISTORY_TABLE = [dbo].[BasketShortBorrowData_history])
+)
+GO
+ALTER TABLE [dbo].[BasketShortBorrowData] ADD PRIMARY KEY CLUSTERED 
+(
+	[iId] ASC
+)WITH (STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ONLINE = OFF, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 GO
