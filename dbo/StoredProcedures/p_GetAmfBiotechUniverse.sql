@@ -1,8 +1,4 @@
-SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
-ALTER PROCEDURE [dbo].[p_GetShortBasketComplete]( 
+ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse]( 
     @AsOfDate          DATE = NULL,
     @LowQualityFilter  BIT =  0) 
  
@@ -10,9 +6,9 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
   Author:   Lee Kafafian 
   Crated:   05/08/2024 
   Object:   p_GetShortBasketComplete 
-  Example:  EXEC p_GetShortBasketComplete @AsOfDate = '06/03/2024'
-            EXEC p_GetShortBasketComplete @LowQualityFilter = 1
-            EXEC p_GetShortBasketComplete @AsOfDate = '06/03/2024', @LowQualityFilter = 1
+  Example:  EXEC p_GetAmfBiotechUniverse @AsOfDate = '06/03/2024'
+            EXEC p_GetAmfBiotechUniverse @LowQualityFilter = 1
+            EXEC p_GetAmfBiotechUniverse @AsOfDate = '06/03/2024', @LowQualityFilter = 1
  */ 
    
  AS  
@@ -58,9 +54,11 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
           SELECT @AsOfDate = CAST(GETDATE() AS DATE) 
         END 
  
- 
-      SELECT TOP 1 @PortDate = epd.AsOfDate FROM dbo.EnfPositionDetails epd WHERE epd.AsOfDate < @AsOfDate ORDER BY epd.AsOfDate DESC 
- 
+      IF @AsOfDate IS NULL
+        BEGIN
+          SELECT TOP 1 @AsOfDate = epd.AsOfDate FROM dbo.BiotechMasterUniverse epd WHERE epd.AsOfDate < @AsOfDate ORDER BY epd.AsOfDate DESC 
+        END
+        
       INSERT INTO #tmpRawDataCombined( 
              AsOfDate, 
              BbgTicker, 
@@ -68,24 +66,13 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
              MrktCap, 
              BbgPrice) 
       SELECT @AsOfDate, 
-             bsu.BbgTicker, 
-             bsu.SecName, 
-             bsu.MarketCap, 
-             bsu.Price 
-        FROM dbo.BasketShortUniverse bsu 
- 
-      INSERT INTO #tmpPortfolio( 
-             AsOfDate, 
-             Strategy, 
-             Substrategy, 
-             Ticker, 
-             Shares, 
-             FirstDate, 
-             ShareChange, 
-             StatusDet) 
-        EXEC dbo.p_RunPortfolioMonitor @AsOfDate = @PortDate, @rstOutput = 4 
- 
- 
+             bmu.BbgTicker, 
+             bmu.SecName, 
+             bmu.MarketCap, 
+             bmu.Price 
+        FROM dbo.BiotechMasterUniverse bmu
+        WHERE bmu.AsOfDate = @AsOfDate
+  
       UPDATE rdc 
          SET rdc.MsTicker = sbd.MspbTicker, 
              rdc.SecNameMs = sbd.SecName, 
@@ -104,32 +91,12 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
       UPDATE rdc 
          SET rdc.bNoMktCap = 1 
         FROM #tmpRawDataCombined rdc 
-       WHERE NOT ABS(COALESCE(rdc.MrktCap, 0))  > 25000000 --BETWEEN 25000000 AND 25000000000000  -- 25M and 25B 
+       WHERE NOT ABS(COALESCE(rdc.MrktCap, 0))  > 20000000  --20,000,000
         
       UPDATE rdc 
          SET rdc.bNoPrice = 1 
         FROM #tmpRawDataCombined rdc 
-       WHERE COALESCE(rdc.BbgPrice, 0) <= .5 
- 
-      UPDATE rdc 
-         SET rdc.bNonRebate = 1 
-        FROM #tmpRawDataCombined rdc 
-       WHERE rdc.SLRate < 0.00 
-          OR rdc.MsAvail IS NULL 
- 
-     UPDATE rdc 
-         SET rdc.bInLongPort = 1 
-        FROM #tmpRawDataCombined rdc 
-        JOIN #tmpPortfolio tpp 
-          ON rdc.BbgTicker = tpp.Ticker 
-       WHERE CHARINDEX('Alpha Long', tpp.Strategy) != 0 
- 
-      UPDATE rdc 
-         SET rdc.bInShortPort = 1 
-        FROM #tmpRawDataCombined rdc 
-        JOIN #tmpPortfolio tpp 
-          ON rdc.BbgTicker = tpp.Ticker 
-       WHERE CHARINDEX('Alpha Short', tpp.Strategy) != 0 
+       WHERE COALESCE(rdc.BbgPrice, 0) <= .09
  
 
       IF @LowQualityFilter = 1
@@ -163,7 +130,8 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
                    rdc.bInShortPort 
               FROM #tmpRawDataCombined rdc 
              WHERE rdc.bNoPrice = 0
-               AND rdc.bNoMktCap = 0 
+               AND rdc.bNoMktCap = 0
+               AND rdc.bUnmapped = 0 
              ORDER BY rdc.AsOfDate, 
                    rdc.BbgTicker, 
                    rdc.MsTicker, 
@@ -207,4 +175,9 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
  
     SET NOCOUNT OFF 
   END 
-GO
+
+
+
+
+  GRANT EXECUTE ON dbo.p_GetAmfBiotechUniverse TO PUBLIC
+  GO
