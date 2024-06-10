@@ -5,7 +5,7 @@ CREATE PROCEDURE dbo.p_ProcessAmfBiotechFactorReturns(
  /* 
   Author:   Lee Kafafian 
   Crated:   01/25/2024 
-  Object:   p_ProcessAmfBiotechFactorReturns 
+  Object:   p_ProcessRawEstUnivData 
   Example:  EXEC dbo.p_ProcessAmfBiotechFactorReturns @AsOfDate = '02/21/2024' 
  */ 
    
@@ -38,4 +38,4 @@ CREATE PROCEDURE dbo.p_ProcessAmfBiotechFactorReturns(
   END 
  
  GRANT EXECUTE ON dbo.p_ProcessAmfBiotechFactorReturns TO PUBLIC
- GO
+GO    

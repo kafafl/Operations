@@ -18,24 +18,26 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
       CREATE TABLE #tmpRawDataCombined( 
         AsOfDate                DATE, 
         BbgTicker               VARCHAR(255) NOT NULL, 
-        MsTicker                VARCHAR(255) NULL, 
+        Ticker                  VARCHAR(255) NULL, 
         SecName                 VARCHAR(500) NOT NULL DEFAULT 'NA', 
         SecNameMs               VARCHAR(500) NULL, 
-        MsCountry               VARCHAR(12) NULL,     
+        Country                 VARCHAR(12) NULL,
+        CntryCode               VARCHAR(12) NULL,
+        Crncy                   VARCHAR(12) NULL,
         MrktCap                 FLOAT NULL, 
-        BbgPrice                FLOAT NULL, 
-        MsPrice                 FLOAT NULL, 
-        PxDiff                  FLOAT NULL, 
-        MsAvail                 VARCHAR(255), 
-        SLRate                  FLOAT, 
-        SLType                  VARCHAR(15) NULL, 
-        bUnmapped               BIT DEFAULT 1, 
+        Price                   FLOAT NULL,
+        PrevPrice               FLOAT NULL,
+        SLDate                  DATE NULL,
+        SLAvail                   FLOAT NULL, 
+        SLRate                  FLOAT NULL, 
+        SLType                  VARCHAR(15) NULL,
+        AvgVolDate              DATE NULL,
+        AvgVol30d               FLOAT NULL,
+        AvgVol90d               FLOAT NULL,
+        AvgVol180d              FLOAT NULL, 
         bNoMktCap               BIT DEFAULT 0, 
         bNoPrice                BIT DEFAULT 0, 
-        bNonRebate              BIT DEFAULT 0, 
-        bNoAvgVol               BIT DEFAULT 0, 
-        bInLongPort             BIT DEFAULT 0, 
-        bInShortPort            BIT DEFAULT 0) 
+        bMappedAvail            BIT DEFAULT 0) 
  
       CREATE TABLE #tmpPortfolio( 
         AsOfDate                DATE, 
@@ -58,31 +60,35 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
         BEGIN
           SELECT TOP 1 @AsOfDate = epd.AsOfDate FROM dbo.BiotechMasterUniverse epd WHERE epd.AsOfDate < @AsOfDate ORDER BY epd.AsOfDate DESC 
         END
-        
+
       INSERT INTO #tmpRawDataCombined( 
              AsOfDate, 
              BbgTicker, 
-             SecName, 
+             SecName,
+             CntryCode,
+             Crncy,
              MrktCap, 
-             BbgPrice) 
+             Price) 
       SELECT @AsOfDate, 
              bmu.BbgTicker, 
-             bmu.SecName, 
+             bmu.SecName,
+             RTRIM(LTRIM(SUBSTRING(bmu.BbgTicker, CHARINDEX(' ', bmu.BbgTicker), CHARINDEX(' ', bmu.BbgTicker, CHARINDEX(' ', bmu.BbgTicker)) - 1))), 
+             bmu.Crncy,
              bmu.MarketCap, 
              bmu.Price 
         FROM dbo.BiotechMasterUniverse bmu
         WHERE bmu.AsOfDate = @AsOfDate
   
       UPDATE rdc 
-         SET rdc.MsTicker = sbd.MspbTicker, 
+         SET rdc.Ticker = sbd.MspbTicker, 
              rdc.SecNameMs = sbd.SecName, 
-             rdc.MsCountry = sbd.Country, 
+             rdc.Country = sbd.Country, 
              rdc.SLRate = sbd.Rate, 
              rdc.SLType = sbd.RateType, 
-             rdc.MsPrice = sbd.ClsPrice, 
-             rdc.PxDiff = ROUND(rdc.BbgPrice - sbd.ClsPrice, 2), 
-             rdc.MsAvail = CASE WHEN sbd.vAvailability = 'LIMITED' THEN NULL ELSE sbd.vAvailability END, 
-             rdc.bUnmapped = 0 
+             rdc.Price = sbd.ClsPrice, 
+             rdc.SLAvail = CASE WHEN sbd.vAvailability = 'LIMITED' THEN NULL ELSE sbd.vAvailability END,
+             rdc.SLDate = CAST(sbd.SysStartTime AS DATE),
+             rdc.bMappedAvail = 1
         FROM #tmpRawDataCombined rdc 
         JOIN dbo.BasketShortBorrowData sbd  
           ON sbd.MspbTicker = LEFT(rdc.BBgTicker, CHARINDEX(' ', rdc.BbgTicker)) 
@@ -91,86 +97,65 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
       UPDATE rdc 
          SET rdc.bNoMktCap = 1 
         FROM #tmpRawDataCombined rdc 
-       WHERE NOT ABS(COALESCE(rdc.MrktCap, 0))  > 20000000  --20,000,000
+       WHERE NOT ABS(COALESCE(rdc.MrktCap, 0))  > 20000000 -- 20,000,000 20 Million
         
       UPDATE rdc 
          SET rdc.bNoPrice = 1 
         FROM #tmpRawDataCombined rdc 
-       WHERE COALESCE(rdc.BbgPrice, 0) <= .09
+       WHERE COALESCE(rdc.Price, 0) <= .1   -- $0.10 /  10 cents or more in price
  
 
       IF @LowQualityFilter = 1
         BEGIN
             SELECT rdc.AsOfDate, 
                    rdc.BbgTicker, 
-                   COALESCE(rdc.MsTicker, RTRIM(LEFT(rdc.BbgTicker, CHARINDEX(' ', rdc.BbgTicker)))) AS MsTicker, 
+                   COALESCE(rdc.Ticker, RTRIM(LEFT(rdc.BbgTicker, CHARINDEX(' ', rdc.BbgTicker)))) AS Ticker, 
                    rdc.SecName, 
-                   rdc.SecNameMs, 
-                   rdc.MsCountry, 
+                   rdc.Crncy, 
+                   rdc.CntryCode, 
                    rdc.MrktCap, 
-                   rdc.BbgPrice, 
-                   rdc.MsPrice, 
-                   rdc.PxDiff, 
-                   ROUND(CASE WHEN rdc.MsPrice = 0 AND rdc.BbgPrice != 0  
-                              THEN rdc.BbgPrice  
-                              WHEN rdc.BbgPrice = 0 AND rdc.MsPrice != 0  
-                              THEN rdc.MsPrice  
-                              ELSE COALESCE(rdc.BbgPrice, rdc.MsPrice) 
-                   END, 4) AS AnyPrice, 
-                   COALESCE(rdc.MsAvail, 'LIMITED') AS MsAvail, 
+                   rdc.Price,
+                   rdc.SLDate,                   
+                   rdc.SLAvail, 
                    rdc.SLRate, 
-                   rdc.SLType, 
-                   '' AS AvgVolume, 
-                   rdc.bUnmapped, 
-                   rdc.bNoMktCap, 
-                   rdc.bNonRebate, 
-                   rdc.bNoPrice, 
-                   rdc.bNoAvgVol, 
-                   rdc.bInLongPort, 
-                   rdc.bInShortPort 
+                   rdc.SLType,
+                   rdc.AvgVolDate,
+                   rdc.AvgVol30d,
+                   rdc.AvgVol90d,
+                   rdc.AvgVol180d,
+                   rdc.bNoMktCap,
+                   rdc.bNoPrice
               FROM #tmpRawDataCombined rdc 
              WHERE rdc.bNoPrice = 0
                AND rdc.bNoMktCap = 0
-               AND rdc.bUnmapped = 0 
-             ORDER BY rdc.AsOfDate, 
-                   rdc.BbgTicker, 
-                   rdc.MsTicker, 
-                   rdc.SecName
+               AND rdc.CntryCode IN ('US', 'CN') 
+               --AND rdc.bMappedAvail = 1
+             ORDER BY COALESCE(rdc.SecName, 'zzz' + rdc.BbgTicker)
         END
       ELSE
         BEGIN
             SELECT rdc.AsOfDate, 
                    rdc.BbgTicker, 
-                   COALESCE(rdc.MsTicker, RTRIM(LEFT(rdc.BbgTicker, CHARINDEX(' ', rdc.BbgTicker)))) AS MsTicker,  
+                   COALESCE(rdc.Ticker, RTRIM(LEFT(rdc.BbgTicker, CHARINDEX(' ', rdc.BbgTicker)))) AS Ticker, 
                    rdc.SecName, 
-                   rdc.SecNameMs, 
-                   rdc.MsCountry, 
+                   rdc.Crncy, 
+                   rdc.CntryCode, 
                    rdc.MrktCap, 
-                   rdc.BbgPrice, 
-                   rdc.MsPrice, 
-                   rdc.PxDiff, 
-                   ROUND(CASE WHEN rdc.MsPrice = 0 AND rdc.BbgPrice != 0  
-                              THEN rdc.BbgPrice  
-                              WHEN rdc.BbgPrice = 0 AND rdc.MsPrice != 0  
-                              THEN rdc.MsPrice  
-                              ELSE COALESCE(rdc.BbgPrice, rdc.MsPrice) 
-                   END, 4) AS AnyPrice, 
-                   COALESCE(rdc.MsAvail, 'LIMITED') AS MsAvail, 
+                   rdc.Price,
+                   rdc.SLDate,                   
+                   rdc.SLAvail, 
                    rdc.SLRate, 
                    rdc.SLType, 
-                   '' AS AvgVolume, 
-                   rdc.bUnmapped, 
-                   rdc.bNoMktCap, 
-                   rdc.bNonRebate, 
-                   rdc.bNoPrice, 
-                   rdc.bNoAvgVol, 
-                   rdc.bInLongPort, 
-                   rdc.bInShortPort 
-              FROM #tmpRawDataCombined rdc
-             ORDER BY rdc.AsOfDate, 
-                   rdc.BbgTicker, 
-                   rdc.MsTicker, 
-                   rdc.SecName
+                   rdc.AvgVolDate,
+                   rdc.AvgVol30d,
+                   rdc.AvgVol90d,
+                   rdc.AvgVol180d,
+                   rdc.bNoMktCap,
+                   rdc.bNoPrice 
+              FROM #tmpRawDataCombined rdc 
+             WHERE rdc.CntryCode IN ('US', 'CN') 
+               AND 1 = 1  --rdc.bMappedAvail = 1
+             ORDER BY COALESCE(rdc.SecName, 'zzz' + rdc.BbgTicker)
         END  
  
     SET NOCOUNT OFF 
