@@ -1,3 +1,8 @@
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
 ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse]( 
     @AsOfDate          DATE = NULL,
     @LowQualityFilter  BIT =  0) 
@@ -24,11 +29,12 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
         Country                 VARCHAR(12) NULL,
         CntryCode               VARCHAR(12) NULL,
         Crncy                   VARCHAR(12) NULL,
-        MrktCap                 FLOAT NULL, 
+        MrktCap                 FLOAT NULL,
+        EntVal                  FLOAT NULL,
         Price                   FLOAT NULL,
         PrevPrice               FLOAT NULL,
         SLDate                  DATE NULL,
-        SLAvail                   FLOAT NULL, 
+        SLAvail                 FLOAT NULL, 
         SLRate                  FLOAT NULL, 
         SLType                  VARCHAR(15) NULL,
         AvgVolDate              DATE NULL,
@@ -36,7 +42,8 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
         AvgVol90d               FLOAT NULL,
         AvgVol180d              FLOAT NULL, 
         bNoMktCap               BIT DEFAULT 0, 
-        bNoPrice                BIT DEFAULT 0, 
+        bNoPrice                BIT DEFAULT 0,
+        bNoEntValue             BIT DEFAULT 0, 
         bMappedAvail            BIT DEFAULT 0) 
  
       CREATE TABLE #tmpPortfolio( 
@@ -68,13 +75,15 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
              CntryCode,
              Crncy,
              MrktCap, 
+             EntVal,
              Price) 
       SELECT @AsOfDate, 
              bmu.BbgTicker, 
              bmu.SecName,
              RTRIM(LTRIM(SUBSTRING(bmu.BbgTicker, CHARINDEX(' ', bmu.BbgTicker), CHARINDEX(' ', bmu.BbgTicker, CHARINDEX(' ', bmu.BbgTicker)) - 1))), 
              bmu.Crncy,
-             bmu.MarketCap, 
+             bmu.MarketCap,
+             bmu.EnterpriseValue, 
              bmu.Price 
         FROM dbo.BiotechMasterUniverse bmu
         WHERE bmu.AsOfDate = @AsOfDate
@@ -97,14 +106,18 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
       UPDATE rdc 
          SET rdc.bNoMktCap = 1 
         FROM #tmpRawDataCombined rdc 
-       WHERE NOT ABS(COALESCE(rdc.MrktCap, 0))  > 20000000 -- 20,000,000 20 Million
-        
+       WHERE NOT ABS(COALESCE(rdc.MrktCap, 0))  > 20000000      /*   20,000,000 20 Million               */
+
+      UPDATE rdc 
+         SET rdc.bNoEntValue = 1 
+        FROM #tmpRawDataCombined rdc 
+       WHERE COALESCE(rdc.EntVal, 0) <= 0                       /*   ZERO OR LESS ENTERPRISE VALUE       */
+
       UPDATE rdc 
          SET rdc.bNoPrice = 1 
         FROM #tmpRawDataCombined rdc 
-       WHERE COALESCE(rdc.Price, 0) <= .1   -- $0.10 /  10 cents or more in price
+       WHERE COALESCE(rdc.Price, 0) <= .1                       /*   $0.10 /  10 cents or more in price  */
  
-
       IF @LowQualityFilter = 1
         BEGIN
             SELECT rdc.AsOfDate, 
@@ -113,7 +126,8 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
                    rdc.SecName, 
                    rdc.Crncy, 
                    rdc.CntryCode, 
-                   rdc.MrktCap, 
+                   rdc.MrktCap,
+                   rdc.EntVal, 
                    rdc.Price,
                    rdc.SLDate,                   
                    rdc.SLAvail, 
@@ -124,12 +138,13 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
                    rdc.AvgVol90d,
                    rdc.AvgVol180d,
                    rdc.bNoMktCap,
-                   rdc.bNoPrice
+                   rdc.bNoPrice,
+                   rdc.bNoEntValue
               FROM #tmpRawDataCombined rdc 
              WHERE rdc.bNoPrice = 0
                AND rdc.bNoMktCap = 0
+               AND rdc.bNoEntValue = 0
                AND rdc.CntryCode IN ('US', 'CN') 
-               --AND rdc.bMappedAvail = 1
              ORDER BY COALESCE(rdc.SecName, 'zzz' + rdc.BbgTicker)
         END
       ELSE
@@ -140,7 +155,8 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
                    rdc.SecName, 
                    rdc.Crncy, 
                    rdc.CntryCode, 
-                   rdc.MrktCap, 
+                   rdc.MrktCap,
+                   rdc.EntVal, 
                    rdc.Price,
                    rdc.SLDate,                   
                    rdc.SLAvail, 
@@ -154,7 +170,7 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
                    rdc.bNoPrice 
               FROM #tmpRawDataCombined rdc 
              WHERE rdc.CntryCode IN ('US', 'CN') 
-               AND 1 = 1  --rdc.bMappedAvail = 1
+               AND 1 = 1  /*  rdc.bMappedAvail = 1  */
              ORDER BY COALESCE(rdc.SecName, 'zzz' + rdc.BbgTicker)
         END  
  
@@ -162,7 +178,5 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
   END 
 
 
-
-
-  GRANT EXECUTE ON dbo.p_GetAmfBiotechUniverse TO PUBLIC
-  GO
+GRANT EXECUTE ON dbo.p_GetAmfBiotechUniverse TO PUBLIC
+GO

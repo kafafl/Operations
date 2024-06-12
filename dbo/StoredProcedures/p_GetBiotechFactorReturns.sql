@@ -2,14 +2,15 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
-CREATE PROCEDURE [dbo].[p_GetBiotechFactorReturns]( 
+
+ALTER PROCEDURE [dbo].[p_GetBiotechFactorReturns]( 
     @AsOfDate          DATE = NULL) 
  
  /* 
   Author:   Lee Kafafian 
   Crated:   06/10/2024 
   Object:   p_GetBiotechFactorReturns 
-  Example:  EXEC p_GetBiotechFactorReturns @AsOfDate = '06/03/2024'
+  Example:  EXEC p_GetBiotechFactorReturns @AsOfDate = '06/07/2024'
  */ 
    
  AS  
@@ -49,18 +50,21 @@ CREATE PROCEDURE [dbo].[p_GetBiotechFactorReturns](
           SecName                 VARCHAR(500) NOT NULL DEFAULT 'NA', 
           Crncy                   VARCHAR(12) NULL,
           CntryCode               VARCHAR(12) NULL,        
-          MrktCap                 FLOAT NULL, 
+          MrktCap                 FLOAT NULL,
+          EntVal                  FLOAT NULL, 
           Price                   FLOAT NULL,
           SLDate                  DATE NULL,
-          SLAvail                   FLOAT NULL, 
+          SLAvail                 FLOAT NULL, 
           SLRate                  FLOAT NULL, 
           SLType                  VARCHAR(15) NULL,
           AvgVolDate              DATE NULL,
           AvgVol30d               FLOAT NULL,
           AvgVol90d               FLOAT NULL,
           AvgVol180d              FLOAT NULL, 
-          bNoMktCap               BIT DEFAULT 0, 
-          bNoPrice                BIT DEFAULT 0) 
+          bNoMktCap               BIT DEFAULT 0,
+          bNoEntVal               BIT DEFAULT 0, 
+          bNoPrice                BIT DEFAULT 0, 
+          bNoEntValue             BIT DEFAULT 0) 
 
 
 
@@ -120,6 +124,7 @@ CREATE PROCEDURE [dbo].[p_GetBiotechFactorReturns](
               WHERE bfr.AsOfDate = @AsOfDate
                 AND bfr.JobReference = @JobRef
 
+/**/
 
              INSERT INTO #tmpBiotechMaster( 
                     AsOfDate,
@@ -128,7 +133,8 @@ CREATE PROCEDURE [dbo].[p_GetBiotechFactorReturns](
                     SecName,
                     Crncy,
                     CntryCode,
-                    MrktCap, 
+                    MrktCap,
+                    EntVal, 
                     Price,
                     SLDate,
                     SLAvail,
@@ -139,39 +145,39 @@ CREATE PROCEDURE [dbo].[p_GetBiotechFactorReturns](
                     AvgVol90d,
                     AvgVol180d,
                     bNoMktCap,
-                    bNoPrice)
+                    bNoPrice,
+                    bNoEntValue)  
                EXEC p_GetAmfBiotechUniverse @AsOfDate = @AsOfDate, @LowQualityFilter = 1
 
 
-
- /*  RETURN THESE RESULTS  */
-     SELECT bmu.AsOfDate,
-            bmu.BbgTicker,
-            bmu.Ticker,
-            bmu.SecName,
-            tfr.BetaExp, 
-            tfr.CarbonEfficiencyExp, 
-            tfr.DividendYieldExp, 
-            tfr.EarningsQualityExp, 
-            tfr.EarningsVariabilityExp, 
-            tfr.EarningsYieldExp, 
-            tfr.EsgExp, 
-            tfr.GrowthExp, 
-            tfr.InvestmentQualityExp, 
-            tfr.LeverageExp, 
-            tfr.LiquidityExp, 
-            tfr.LongTermReversalExp, 
-            tfr.MidCapitalizationExp, 
-            tfr.MomentumExp, 
-            tfr.ProfitabilityExp, 
-            tfr.ResidualVolatilityExp, 
-            tfr.ShortInerestExp, 
-            tfr.SizeExp, 
-            tfr.ValueExp
-       FROM #tmpBiotechMaster bmu
-       LEFT JOIN #tmpFactorReturns tfr
-         ON bmu.AsOfDate = tfr.AsOfDate
-        AND bmu.Ticker = tfr.AssetId
+    /*  RETURN THESE RESULTS  */
+         SELECT bmu.AsOfDate,
+                bmu.BbgTicker,
+                bmu.Ticker,
+                bmu.SecName,
+                tfr.BetaExp, 
+                tfr.CarbonEfficiencyExp, 
+                tfr.DividendYieldExp, 
+                tfr.EarningsQualityExp, 
+                tfr.EarningsVariabilityExp, 
+                tfr.EarningsYieldExp, 
+                tfr.EsgExp, 
+                tfr.GrowthExp, 
+                tfr.InvestmentQualityExp, 
+                tfr.LeverageExp, 
+                tfr.LiquidityExp, 
+                tfr.LongTermReversalExp, 
+                tfr.MidCapitalizationExp, 
+                tfr.MomentumExp, 
+                tfr.ProfitabilityExp, 
+                tfr.ResidualVolatilityExp, 
+                tfr.ShortInerestExp, 
+                tfr.SizeExp, 
+                tfr.ValueExp
+           FROM #tmpBiotechMaster bmu
+           LEFT JOIN #tmpFactorReturns tfr
+             ON bmu.AsOfDate = tfr.AsOfDate
+            AND bmu.Ticker = tfr.AssetId
 
 
     SET NOCOUNT OFF 

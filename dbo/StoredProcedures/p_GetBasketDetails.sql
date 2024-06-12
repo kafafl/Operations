@@ -6,10 +6,10 @@ ALTER PROCEDURE dbo.p_GetBasketDetails(
     @AsOfDate   DATE NULL = DEFAULT )
  
  /*
-  Author: Lee Kafafian
-  Crated: 09/25/2023
-  Object: p_GetBasketDetails
-  Example:  EXEC dbo.p_GetBasketDetails @BasketName = 'MSA1BIO Index'
+  Author:   Lee Kafafian
+  Crated:   09/25/2023
+  Object:   p_GetBasketDetails
+  Example:  EXEC dbo.p_GetBasketDetails @BasketName = 'MSA1BIOH'
  */
   
  AS 
@@ -20,10 +20,11 @@ ALTER PROCEDURE dbo.p_GetBasketDetails(
 
      IF @AsOfDate IS NULL
        BEGIN
-         SELECT TOP 1 @AsOfDate = CAST(bsk.UpdateDate AS DATE) FROM dbo.BasketConstituents bsk WHERE bsk.BasketName = @BasketName  ORDER BY bsk.UpdateDate DESC
+         SELECT TOP 1 @AsOfDate = bsk.AsOfDate FROM dbo.MspbBasketDetails bsk WHERE bsk.BasketTicker = @BasketName  ORDER BY bsk.AsOfDate DESC
        END
 /**/
     CREATE TABLE #tmpBasket(
+      AsOfDate        DATE,
       BasketName      VARCHAR(500),
       ConstName       VARCHAR(500),
       Weights         FLOAT,        /* <-- NEED TO ADD TO DATABASE TABLE  */
@@ -31,16 +32,17 @@ ALTER PROCEDURE dbo.p_GetBasketDetails(
 
 
      INSERT INTO #tmpBasket(
+            AsOfDate,
             BasketName,
             ConstName,
             UpdateDate)
-     SELECT bsk.BasketName,
-            bsk.ConstName,
-            bsk.UpdateDate
-       FROM dbo.BasketConstituents bsk
-      WHERE bsk.UpdateDate >= @AsOfDate 
-        AND bsk.BasketName = @BasketName
-
+     SELECT bsk.AsOfDate,
+            bsk.BasketTicker + ' Index',
+            bsk.CompTicker + ' Equity',
+            bsk.AsOfDate
+       FROM dbo.MspbBasketDetails bsk
+      WHERE bsk.AsOfDate = @AsOfDate 
+        AND bsk.BasketTicker = @BasketName
 
      SELECT tbk.BasketName,
             tbk.ConstName,
@@ -57,3 +59,4 @@ ALTER PROCEDURE dbo.p_GetBasketDetails(
 
    GRANT EXECUTE ON dbo.p_GetBasketDetails TO PUBLIC
    GO
+
