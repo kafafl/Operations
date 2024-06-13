@@ -11,9 +11,9 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
   Author:   Lee Kafafian 
   Crated:   05/08/2024 
   Object:   p_GetShortBasketComplete 
-  Example:  EXEC p_GetAmfBiotechUniverse @AsOfDate = '06/03/2024'
+  Example:  EXEC p_GetAmfBiotechUniverse @AsOfDate = '06/12/2024'
             EXEC p_GetAmfBiotechUniverse @LowQualityFilter = 1
-            EXEC p_GetAmfBiotechUniverse @AsOfDate = '06/03/2024', @LowQualityFilter = 1
+            EXEC p_GetAmfBiotechUniverse @AsOfDate = '06/11/2024', @LowQualityFilter = 1
  */ 
    
  AS  
@@ -56,7 +56,8 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
         ShareChange             FLOAT, 
         StatusDet               VARCHAR(500)) 
  
-      DECLARE @PortDate AS DATE 
+      DECLARE @PortDate AS DATE
+      DECLARE @MktDataDate AS DATE
  
       IF @AsOfDate IS NULL 
         BEGIN 
@@ -86,7 +87,7 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
              bmu.EnterpriseValue, 
              bmu.Price 
         FROM dbo.BiotechMasterUniverse bmu
-        WHERE bmu.AsOfDate = @AsOfDate
+       WHERE bmu.AsOfDate = @AsOfDate
   
       UPDATE rdc 
          SET rdc.Ticker = sbd.MspbTicker, 
@@ -103,6 +104,44 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
           ON sbd.MspbTicker = LEFT(rdc.BBgTicker, CHARINDEX(' ', rdc.BbgTicker)) 
          AND CASE WHEN sbd.Country = 'USA' THEN 'US' WHEN sbd.Country = 'CAN' THEN 'CN' ELSE 'N/A' END = RTRIM(LTRIM(SUBSTRING(rdc.BbgTicker, CHARINDEX(' ', rdc.BbgTicker), CHARINDEX(' ', rdc.BbgTicker, CHARINDEX(' ', rdc.BbgTicker)) - 1))) 
  
+
+       SELECT TOP 1 @MktDataDate = amd.AsOfDate 
+         FROM dbo.AmfMarketData amd
+        WHERE amd.AsOfDate IS NOT NULL 
+          AND amd.AsOfDate <= @AsOfDate 
+        ORDER BY amd.AsOfDate DESC 
+
+       UPDATE rdc
+          SET rdc.AvgVolDate = @MktDataDate
+         FROM #tmpRawDataCombined rdc
+
+       UPDATE rdc
+          SET rdc.AvgVol30d = amd.MdValue
+         FROM #tmpRawDataCombined rdc 
+         JOIN dbo.AmfMarketData amd
+           ON rdc.AvgVolDate = amd.AsOfDate
+          AND rdc.BbgTicker = amd.PositionId
+        WHERE amd.DataSource = 'Bloomberg' 
+          AND amd.TagMnemonic = 'VOLUME_AVG_30D'
+
+       UPDATE rdc
+          SET rdc.AvgVol90d = amd.MdValue
+         FROM #tmpRawDataCombined rdc 
+         JOIN dbo.AmfMarketData amd
+           ON rdc.AvgVolDate = amd.AsOfDate
+          AND rdc.BbgTicker = amd.PositionId
+        WHERE amd.DataSource = 'Bloomberg' 
+          AND amd.TagMnemonic = 'VOLUME_AVG_3M'
+
+       UPDATE rdc
+          SET rdc.AvgVol180d = amd.MdValue
+         FROM #tmpRawDataCombined rdc 
+         JOIN dbo.AmfMarketData amd
+           ON rdc.AvgVolDate = amd.AsOfDate
+          AND rdc.BbgTicker = amd.PositionId
+        WHERE amd.DataSource = 'Bloomberg' 
+          AND amd.TagMnemonic = 'VOLUME_AVG_6M'
+
       UPDATE rdc 
          SET rdc.bNoMktCap = 1 
         FROM #tmpRawDataCombined rdc 
@@ -167,7 +206,8 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
                    rdc.AvgVol90d,
                    rdc.AvgVol180d,
                    rdc.bNoMktCap,
-                   rdc.bNoPrice 
+                   rdc.bNoPrice,
+                   rdc.bNoEntValue
               FROM #tmpRawDataCombined rdc 
              WHERE rdc.CntryCode IN ('US', 'CN') 
                AND 1 = 1  /*  rdc.bMappedAvail = 1  */

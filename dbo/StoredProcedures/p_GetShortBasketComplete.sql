@@ -3,43 +3,19 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 ALTER PROCEDURE [dbo].[p_GetShortBasketComplete]( 
-    @AsOfDate          DATE = NULL,
-    @LowQualityFilter  BIT =  0) 
+    @AsOfDate          DATE = NULL) 
  
  /* 
   Author:   Lee Kafafian 
   Crated:   05/08/2024 
   Object:   p_GetShortBasketComplete 
-  Example:  EXEC p_GetShortBasketComplete @AsOfDate = '06/03/2024'
-            EXEC p_GetShortBasketComplete @LowQualityFilter = 1
-            EXEC p_GetShortBasketComplete @AsOfDate = '06/03/2024', @LowQualityFilter = 1
+  Example:  EXEC dbo.p_GetShortBasketComplete @AsOfDate = '06/03/2024'
+            EXEC dbo.p_GetShortBasketComplete
  */ 
    
  AS  
   BEGIN 
     SET NOCOUNT ON 
- 
-      CREATE TABLE #tmpRawDataCombined( 
-        AsOfDate                DATE, 
-        BbgTicker               VARCHAR(255) NOT NULL, 
-        MsTicker                VARCHAR(255) NULL, 
-        SecName                 VARCHAR(500) NOT NULL DEFAULT 'NA', 
-        SecNameMs               VARCHAR(500) NULL, 
-        MsCountry               VARCHAR(12) NULL,     
-        MrktCap                 FLOAT NULL, 
-        BbgPrice                FLOAT NULL, 
-        MsPrice                 FLOAT NULL, 
-        PxDiff                  FLOAT NULL, 
-        MsAvail                 VARCHAR(255), 
-        SLRate                  FLOAT, 
-        SLType                  VARCHAR(15) NULL, 
-        bUnmapped               BIT DEFAULT 1, 
-        bNoMktCap               BIT DEFAULT 0, 
-        bNoPrice                BIT DEFAULT 0, 
-        bNonRebate              BIT DEFAULT 0, 
-        bNoAvgVol               BIT DEFAULT 0, 
-        bInLongPort             BIT DEFAULT 0, 
-        bInShortPort            BIT DEFAULT 0) 
  
       CREATE TABLE #tmpPortfolio( 
         AsOfDate                DATE, 
@@ -50,6 +26,31 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
         FirstDate               DATE, 
         ShareChange             FLOAT, 
         StatusDet               VARCHAR(500)) 
+
+     CREATE TABLE #tmpBiotechMaster( 
+        AsOfDate                DATE, 
+        BbgTicker               VARCHAR(255) NOT NULL, 
+        Ticker                  VARCHAR(255) NULL, 
+        SecName                 VARCHAR(500) NOT NULL DEFAULT 'NA', 
+        Crncy                   VARCHAR(12) NULL,
+        CntryCode               VARCHAR(12) NULL,        
+        MrktCap                 FLOAT NULL,
+        EntVal                  FLOAT NULL, 
+        Price                   FLOAT NULL,
+        SLDate                  DATE NULL,
+        SLAvail                 FLOAT NULL, 
+        SLRate                  FLOAT NULL, 
+        SLType                  VARCHAR(15) NULL,
+        AvgVolDate              DATE NULL,
+        AvgVol30d               FLOAT NULL,
+        AvgVol90d               FLOAT NULL,
+        AvgVol180d              FLOAT NULL, 
+        bNoMktCap               BIT DEFAULT 0,
+        bNoEntVal               BIT DEFAULT 0, 
+        bNoPrice                BIT DEFAULT 0,
+        bNoRebate               BIT DEFAULT 0,
+        bInLongPort             BIT DEFAULT 0,
+        bInShortPort            BIT DEFAULT 0)         
  
       DECLARE @PortDate AS DATE 
  
@@ -59,21 +60,33 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
         END 
  
  
-      SELECT TOP 1 @PortDate = epd.AsOfDate FROM dbo.EnfPositionDetails epd WHERE epd.AsOfDate < @AsOfDate ORDER BY epd.AsOfDate DESC 
+    SELECT TOP 1 @PortDate = epd.AsOfDate FROM dbo.EnfPositionDetails epd WHERE epd.AsOfDate < @AsOfDate ORDER BY epd.AsOfDate DESC 
  
-      INSERT INTO #tmpRawDataCombined( 
-             AsOfDate, 
-             BbgTicker, 
-             SecName, 
-             MrktCap, 
-             BbgPrice) 
-      SELECT @AsOfDate, 
-             bsu.BbgTicker, 
-             bsu.SecName, 
-             bsu.MarketCap, 
-             bsu.Price 
-        FROM dbo.BasketShortUniverse bsu 
- 
+  /* FETCH BIOTECH HIG QUALITY UNIVERESE  */
+     INSERT INTO #tmpBiotechMaster( 
+             AsOfDate,
+             BbgTicker,
+             Ticker,
+             SecName,
+             Crncy,
+             CntryCode,
+             MrktCap,
+             EntVal, 
+             Price,
+             SLDate,
+             SLAvail,
+             SLRate,
+             SLType,
+             AvgVolDate,
+             AvgVol30d,
+             AvgVol90d,
+             AvgVol180d,
+             bNoMktCap,
+             bNoEntVal,
+             bNoPrice)  
+        EXEC dbo.p_GetAmfBiotechUniverse @AsOfDate = @AsOfDate, @LowQualityFilter = 1
+
+  /*  LOAD PORTFOLIO DETAILS      */
       INSERT INTO #tmpPortfolio( 
              AsOfDate, 
              Strategy, 
@@ -84,126 +97,96 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
              ShareChange, 
              StatusDet) 
         EXEC dbo.p_RunPortfolioMonitor @AsOfDate = @PortDate, @rstOutput = 4 
- 
- 
+
+
+  /*  BORROW DATA   */
       UPDATE rdc 
-         SET rdc.MsTicker = sbd.MspbTicker, 
-             rdc.SecNameMs = sbd.SecName, 
-             rdc.MsCountry = sbd.Country, 
+         SET rdc.Ticker = sbd.MspbTicker, 
+             rdc.SecName = sbd.SecName, 
              rdc.SLRate = sbd.Rate, 
              rdc.SLType = sbd.RateType, 
-             rdc.MsPrice = sbd.ClsPrice, 
-             rdc.PxDiff = ROUND(rdc.BbgPrice - sbd.ClsPrice, 2), 
-             rdc.MsAvail = CASE WHEN sbd.vAvailability = 'LIMITED' THEN NULL ELSE sbd.vAvailability END, 
-             rdc.bUnmapped = 0 
-        FROM #tmpRawDataCombined rdc 
+             rdc.SLAvail = CASE WHEN sbd.vAvailability = 'LIMITED' THEN NULL ELSE sbd.vAvailability END,
+             rdc.SLDate = CAST(sbd.SysStartTime AS DATE)
+        FROM #tmpBiotechMaster rdc 
         JOIN dbo.BasketShortBorrowData sbd  
-          ON sbd.MspbTicker = LEFT(rdc.BBgTicker, CHARINDEX(' ', rdc.BbgTicker)) 
+          ON sbd.MspbTicker = rdc.Ticker
          AND CASE WHEN sbd.Country = 'USA' THEN 'US' WHEN sbd.Country = 'CAN' THEN 'CN' ELSE 'N/A' END = RTRIM(LTRIM(SUBSTRING(rdc.BbgTicker, CHARINDEX(' ', rdc.BbgTicker), CHARINDEX(' ', rdc.BbgTicker, CHARINDEX(' ', rdc.BbgTicker)) - 1))) 
- 
-      UPDATE rdc 
-         SET rdc.bNoMktCap = 1 
-        FROM #tmpRawDataCombined rdc 
-       WHERE NOT ABS(COALESCE(rdc.MrktCap, 0))  > 25000000 --BETWEEN 25000000 AND 25000000000000  -- 25M and 25B 
+
+
+        /*  MARKET CAP FILTER          */
+            UPDATE rdc 
+               SET rdc.bNoMktCap = 1 
+              FROM #tmpBiotechMaster rdc 
+             WHERE NOT ABS(COALESCE(rdc.MrktCap, 0))  BETWEEN 25000000 AND 25000000000000      /*   BETWEEN 25M and 25B       */
+
+        /*   ENTERPRISE VALUE FILTER   */
+            UPDATE rdc 
+               SET rdc.bNoEntVal = 1 
+              FROM #tmpBiotechMaster rdc 
+             WHERE NOT ABS(COALESCE(rdc.EntVal, 0))  BETWEEN 1 AND 25000000000000              /*   BETWEEN 1 and 25B         */
+
+        /*   PRICE FILTER              */
+            UPDATE rdc 
+               SET rdc.bNoPrice = 1 
+              FROM #tmpBiotechMaster rdc 
+             WHERE COALESCE(rdc.Price, 0) <= .5                                               /*   GREATER THAN 50 cents     */
         
-      UPDATE rdc 
-         SET rdc.bNoPrice = 1 
-        FROM #tmpRawDataCombined rdc 
-       WHERE COALESCE(rdc.BbgPrice, 0) <= .5 
- 
-      UPDATE rdc 
-         SET rdc.bNonRebate = 1 
-        FROM #tmpRawDataCombined rdc 
-       WHERE rdc.SLRate < 0.00 
-          OR rdc.MsAvail IS NULL 
- 
-     UPDATE rdc 
-         SET rdc.bInLongPort = 1 
-        FROM #tmpRawDataCombined rdc 
-        JOIN #tmpPortfolio tpp 
-          ON rdc.BbgTicker = tpp.Ticker 
-       WHERE CHARINDEX('Alpha Long', tpp.Strategy) != 0 
- 
-      UPDATE rdc 
-         SET rdc.bInShortPort = 1 
-        FROM #tmpRawDataCombined rdc 
-        JOIN #tmpPortfolio tpp 
-          ON rdc.BbgTicker = tpp.Ticker 
-       WHERE CHARINDEX('Alpha Short', tpp.Strategy) != 0 
+        /*   REBATE FILTER              */
+            UPDATE rdc 
+               SET rdc.bNoRebate = 1 
+              FROM #tmpBiotechMaster rdc 
+             WHERE rdc.SLRate < 0.00                                                           /*   GREATER THAN ZERO REBATE  */
+                OR rdc.SLAvail IS NULL 
+        
+        /*  IN LONG PORTFOLIO     */ 
+            UPDATE rdc 
+               SET rdc.bInLongPort = 1 
+              FROM #tmpBiotechMaster rdc 
+              JOIN #tmpPortfolio tpp 
+                ON rdc.BbgTicker = tpp.Ticker 
+             WHERE CHARINDEX('Alpha Long', tpp.Strategy) != 0 
+        
+        /*  IN SHORT PORTFOLIO     */
+            UPDATE rdc 
+               SET rdc.bInShortPort = 1 
+              FROM #tmpBiotechMaster rdc 
+              JOIN #tmpPortfolio tpp 
+                ON rdc.BbgTicker = tpp.Ticker 
+             WHERE CHARINDEX('Alpha Short', tpp.Strategy) != 0 
  
 
-      IF @LowQualityFilter = 1
-        BEGIN
-            SELECT rdc.AsOfDate, 
-                   rdc.BbgTicker, 
-                   COALESCE(rdc.MsTicker, RTRIM(LEFT(rdc.BbgTicker, CHARINDEX(' ', rdc.BbgTicker)))) AS MsTicker, 
-                   rdc.SecName, 
-                   rdc.SecNameMs, 
-                   rdc.MsCountry, 
-                   rdc.MrktCap, 
-                   rdc.BbgPrice, 
-                   rdc.MsPrice, 
-                   rdc.PxDiff, 
-                   ROUND(CASE WHEN rdc.MsPrice = 0 AND rdc.BbgPrice != 0  
-                              THEN rdc.BbgPrice  
-                              WHEN rdc.BbgPrice = 0 AND rdc.MsPrice != 0  
-                              THEN rdc.MsPrice  
-                              ELSE COALESCE(rdc.BbgPrice, rdc.MsPrice) 
-                   END, 4) AS AnyPrice, 
-                   COALESCE(rdc.MsAvail, 'LIMITED') AS MsAvail, 
-                   rdc.SLRate, 
-                   rdc.SLType, 
-                   '' AS AvgVolume, 
-                   rdc.bUnmapped, 
-                   rdc.bNoMktCap, 
-                   rdc.bNonRebate, 
-                   rdc.bNoPrice, 
-                   rdc.bNoAvgVol, 
-                   rdc.bInLongPort, 
-                   rdc.bInShortPort 
-              FROM #tmpRawDataCombined rdc 
-             WHERE rdc.bNoPrice = 0
-               AND rdc.bNoMktCap = 0 
-             ORDER BY rdc.AsOfDate, 
-                   rdc.BbgTicker, 
-                   rdc.MsTicker, 
-                   rdc.SecName
-        END
-      ELSE
-        BEGIN
-            SELECT rdc.AsOfDate, 
-                   rdc.BbgTicker, 
-                   COALESCE(rdc.MsTicker, RTRIM(LEFT(rdc.BbgTicker, CHARINDEX(' ', rdc.BbgTicker)))) AS MsTicker,  
-                   rdc.SecName, 
-                   rdc.SecNameMs, 
-                   rdc.MsCountry, 
-                   rdc.MrktCap, 
-                   rdc.BbgPrice, 
-                   rdc.MsPrice, 
-                   rdc.PxDiff, 
-                   ROUND(CASE WHEN rdc.MsPrice = 0 AND rdc.BbgPrice != 0  
-                              THEN rdc.BbgPrice  
-                              WHEN rdc.BbgPrice = 0 AND rdc.MsPrice != 0  
-                              THEN rdc.MsPrice  
-                              ELSE COALESCE(rdc.BbgPrice, rdc.MsPrice) 
-                   END, 4) AS AnyPrice, 
-                   COALESCE(rdc.MsAvail, 'LIMITED') AS MsAvail, 
-                   rdc.SLRate, 
-                   rdc.SLType, 
-                   '' AS AvgVolume, 
-                   rdc.bUnmapped, 
-                   rdc.bNoMktCap, 
-                   rdc.bNonRebate, 
-                   rdc.bNoPrice, 
-                   rdc.bNoAvgVol, 
-                   rdc.bInLongPort, 
-                   rdc.bInShortPort 
-              FROM #tmpRawDataCombined rdc
-             ORDER BY rdc.AsOfDate, 
-                   rdc.BbgTicker, 
-                   rdc.MsTicker, 
-                   rdc.SecName
-        END  
+    /*  OUTPUT OF STORED PROCEDURE   */
+         SELECT tbm.AsOfDate, 
+                tbm.BbgTicker, 
+                COALESCE(tbm.Ticker, RTRIM(LEFT(tbm.BbgTicker, CHARINDEX(' ', tbm.BbgTicker)))) AS Ticker, 
+                tbm.SecName,
+                tbm.Crncy,
+                tbm.CntryCode,
+                tbm.MrktCap,
+                tbm.EntVal, 
+                tbm.Price,
+                tbm.SLAvail, 
+                tbm.SLRate, 
+                tbm.SLType,
+                tbm.SLDate, 
+                tbm.AvgVol30d,
+                tbm.AvgVol90d,
+                tbm.AvgVol180d, 
+                tbm.bNoMktCap, 
+                tbm.bNoRebate, 
+                tbm.bNoPrice, 
+                tbm.bInLongPort, 
+                tbm.bInShortPort 
+           FROM #tmpBiotechMaster tbm 
+          WHERE tbm.bNoMktCap = 0 
+            AND tbm.bNoEntVal = 0 
+            AND tbm.bNoPrice = 0
+            AND tbm.bNoRebate = 0
+            AND tbm.bInLongPort = 0 
+          ORDER BY tbm.AsOfDate, 
+                tbm.BbgTicker, 
+                tbm.SecName
+
  
     SET NOCOUNT OFF 
   END 

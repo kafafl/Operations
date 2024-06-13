@@ -1,14 +1,16 @@
-USE Operations
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
 GO
 
-ALTER PROCEDURE dbo.p_GetBasketDetails(
+ALTER PROCEDURE [dbo].[p_GetBasketDetails](
     @BasketName VARCHAR(255),
     @AsOfDate   DATE NULL = DEFAULT )
  
  /*
-  Author:   Lee Kafafian
-  Crated:   09/25/2023
-  Object:   p_GetBasketDetails
+  Author: Lee Kafafian
+  Crated: 09/25/2023
+  Object: p_GetBasketDetails
   Example:  EXEC dbo.p_GetBasketDetails @BasketName = 'MSA1BIOH'
  */
   
@@ -55,7 +57,7 @@ ALTER PROCEDURE dbo.p_GetBasketDetails(
    SET NOCOUNT OFF
 
    END
-   GO
+GO
 
    GRANT EXECUTE ON dbo.p_GetBasketDetails TO PUBLIC
    GO
