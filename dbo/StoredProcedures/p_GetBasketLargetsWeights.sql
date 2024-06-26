@@ -30,7 +30,7 @@ ALTER PROCEDURE [dbo].[p_GetBasketLargestWeights](
         SELECT TOP 10 
                REPLACE(msb.BasketTicker, ' Index', '') AS BasketName,
                SUBSTRING(msb.CompTicker, 1, CHARINDEX(' ', msb.CompTicker)) AS ConstName,
-               msb.PctWeight
+               msb.PctWeight AS BasketWght
           FROM dbo.MspbBasketDetails msb
          WHERE msb.AsOfDate = @AsOfDate
          ORDER BY msb.PctWeight DESC

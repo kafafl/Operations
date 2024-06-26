@@ -1,4 +1,8 @@
-CREATE PROCEDURE [dbo].[p_GetEnfPositionData](
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[p_GetEnfPositionData](
   @AsOfDate   DATE NULL = DEFAULT,
   @ResultSet  INT = 1,
   @EquitiesOnly BIT = 0)
@@ -9,6 +13,8 @@ CREATE PROCEDURE [dbo].[p_GetEnfPositionData](
   Object: p_GetEnfPositionData
   Example:  EXEC dbo.p_GetEnfPositionData @AsOfDate = '03/28/2024', @ResultSet = 1
             EXEC dbo.p_GetEnfPositionData @AsOfDate = '12/29/2023', @ResultSet = 1, @EquitiesOnly = 1
+            EXEC dbo.p_GetEnfPositionData @AsOfDate = '5/31/2024', @ResultSet = 2
+
  */
   
  AS 
@@ -220,65 +226,68 @@ CREATE PROCEDURE [dbo].[p_GetEnfPositionData](
       END
 
 
-  IF @ResultSet = 1
-    BEGIN
-      DELETE tsp
-        FROM #tmpPositions tsp
-       WHERE ABS(ROUND(tsp.Quantity, 0)) = 0
-	  END
+    IF @ResultSet = 1
+      BEGIN
+        DELETE tsp
+          FROM #tmpPositions tsp
+         WHERE ABS(ROUND(tsp.Quantity, 0)) = 0
 
+        DELETE tsp
+          FROM #tmpPositions tsp
+         WHERE CHARINDEX('FX Spot', tsp.InstDescr) = 0
+            OR CHARINDEX('FX Forward', tsp.InstDescr) = 0
+            OR (CHARINDEX('Settled Cash', tsp.InstDescr) = 0)
+      END
 
-      SELECT tsp.AsOfDate,
-             tsp.FundShortName,
-             tsp.StratName,
-             tsp.BookName,
-             tsp.InstDescr,
-             tsp.BBYellowKey,
-             tsp.UnderlyBBYellowKey,
-             tsp.Account,
-             tsp.InstrType,
-             tsp.CcyOne,
-             tsp.CcyTwo,
-             tsp.Quantity,
-             tsp.NetAvgCost,
-             tsp.OverallCost,
-             tsp.FairValue,
-             tsp.NetMarketValue,
-             tsp.DlyPnlUsd,
-             tsp.DlyPnlOfNav,
-             tsp.MtdPnlUsd,
-             tsp.MtdPnlOfNav,
-             tsp.YtdPnlUsd,
-             tsp.YtdPnlOfNav,
-             tsp.ItdPnlUsd,
-             tsp.Delta,
-             tsp.DeltaAdjMV,
-             tsp.DeltaExp,
-			       tsp.LongShort,
-             tsp.LongMV,
-             tsp.ShortMV,
-			       tsp.GrExpOfGLNav AS GrossExp,
-             tsp.InstrTypeCode,
-             tsp.InstrTypeUnder,
-             tsp.PrevBusDayNMV
-        FROM #tmpPositions tsp
-	     WHERE 1 = 1
-         AND CHARINDEX('FX Spot', tsp.InstDescr) = 0
-		     AND CHARINDEX('FX Forward', tsp.InstDescr) = 0
-         AND (CHARINDEX('Settled Cash', tsp.InstDescr) = 0)
-	     ORDER BY tsp.AsOfDate,
-             tsp.FundShortName,
-             CASE WHEN RTRIM(LTRIM(tsp.StratName)) = '' THEN 'zzz' ELSE tsp.StratName END,
-             CASE WHEN RTRIM(LTRIM(tsp.BookName)) = '' THEN 'zzz' ELSE tsp.BookName END,
-             tsp.InstDescr,
-             tsp.BBYellowKey,
-             tsp.UnderlyBBYellowKey
+   SELECT tsp.AsOfDate,
+          tsp.FundShortName,
+          tsp.StratName,
+          tsp.BookName,
+          tsp.InstDescr,
+          tsp.BBYellowKey,
+          tsp.UnderlyBBYellowKey,
+          tsp.Account,
+          tsp.InstrType,
+          tsp.CcyOne,
+          tsp.CcyTwo,
+          tsp.Quantity,
+          tsp.NetAvgCost,
+          tsp.OverallCost,
+          tsp.FairValue,
+          tsp.NetMarketValue,
+          tsp.DlyPnlUsd,
+          tsp.DlyPnlOfNav,
+          tsp.MtdPnlUsd,
+          tsp.MtdPnlOfNav,
+          tsp.YtdPnlUsd,
+          tsp.YtdPnlOfNav,
+          tsp.ItdPnlUsd,
+          tsp.Delta,
+          tsp.DeltaAdjMV,
+          tsp.DeltaExp,
+          tsp.LongShort,
+          tsp.LongMV,
+          tsp.ShortMV,
+          tsp.GrExpOfGLNav AS GrossExp,
+          tsp.InstrTypeCode,
+          tsp.InstrTypeUnder,
+          tsp.PrevBusDayNMV
+     FROM #tmpPositions tsp
+    WHERE 1 = 1
+    ORDER BY tsp.AsOfDate,
+          tsp.FundShortName,
+          CASE WHEN RTRIM(LTRIM(tsp.StratName)) = '' THEN 'zzz' ELSE tsp.StratName END,
+          CASE WHEN RTRIM(LTRIM(tsp.BookName)) = '' THEN 'zzz' ELSE tsp.BookName END,
+          tsp.InstDescr,
+          tsp.BBYellowKey,
+          tsp.UnderlyBBYellowKey
 
 
    SET NOCOUNT OFF
 
    END
 GO
+
 
    GRANT EXECUTE ON dbo.p_GetEnfPositionData TO PUBLIC
    GO
