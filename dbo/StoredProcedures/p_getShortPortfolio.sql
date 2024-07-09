@@ -1,4 +1,9 @@
-CREATE PROCEDURE dbo.p_GetShortPortfolio(
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[p_GetShortPortfolio](
     @AsOfDate          DATE = NULL)
  
 
@@ -81,10 +86,8 @@ CREATE PROCEDURE dbo.p_GetShortPortfolio(
                epd.StratName,
                epd.BBYellowKey
 
-
         UPDATE tpo
-           SET tpo.PosLong = tpq.Quantity,
-               tpo.PosNet = tpo.PosShort + tpq.Quantity
+           SET tpo.PosLong = tpq.Quantity
           FROM #tmpPortOutput tpo
           JOIN #tmpPortQuants tpq
             ON tpo.BBYellowkey = tpq.BBYellowkey
@@ -93,11 +96,14 @@ CREATE PROCEDURE dbo.p_GetShortPortfolio(
         UPDATE tpo
            SET tpo.PosLong = COALESCE(tpo.PosLong, 0),
                tpo.PosShort = COALESCE(tpo.PosShort, 0),
-               tpo.PosNet = COALESCE(tpo.PosLong, 0) - COALESCE(tpo.PosShort, 0)
+               tpo.PosNet = COALESCE(tpo.PosLong, 0) + COALESCE(tpo.PosShort, 0)
           FROM #tmpPortOutput tpo
     
 
-           SELECT PosLong,
+           SELECT AsOfDate,
+                  Strategy,
+                  BBYellowkey,           
+                  PosLong,
                   PosShort,
                   PosNet 
              FROM #tmpPortOutput

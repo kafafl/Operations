@@ -1,7 +1,9 @@
-USE Operations
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE PROCEDURE [dbo].[p_GetPerformanceDetails]( 
+ALTER PROCEDURE [dbo].[p_GetPerformanceDetails]( 
     @BegDate         DATE, 
     @EndDate         DATE, 
     @EntityName      VARCHAR(255), 
@@ -12,8 +14,8 @@ CREATE PROCEDURE [dbo].[p_GetPerformanceDetails](
   Author:   Lee Kafafian 
   Crated:   09/05/2023 
   Object:   p_GetPerformanceDetails 
-  Example:  EXEC dbo.p_GetPerformanceDetails @BegDate = '03/25/2024', @EndDate = '3/29/2024', @EntityName = 'AMF' 
-	          EXEC dbo.p_GetPerformanceDetails @BegDate = '03/25/2024', @EndDate = '3/29/2024', @EntityName = 'AMF', @bAggHolidays = 1 
+  Example:  EXEC dbo.p_GetPerformanceDetails @BegDate = '04/01/2024', @EndDate = '07/08/2024', @EntityName = 'AMF UNHEDGED' 
+	        EXEC dbo.p_GetPerformanceDetails @BegDate = '04/01/2024', @EndDate = '7/8/2024', @EntityName = 'AMF', @bAggHolidays = 1 
  */ 
    
   AS  
@@ -30,7 +32,7 @@ CREATE PROCEDURE [dbo].[p_GetPerformanceDetails](
         Entity            VARCHAR(500), 
         DailyReturn       FLOAT, 
 		    DailyReturnNet    FLOAT, 
-		    DailyRetLogNet    FLOAT, 
+	   	  DailyRetLogNet    FLOAT, 
         PeriodReturn      FLOAT, 
 		    PeriodReturnNet   FLOAT, 
         bProcessed        BIT DEFAULT 0)
@@ -44,6 +46,16 @@ CREATE PROCEDURE [dbo].[p_GetPerformanceDetails](
         PeriodReturn      FLOAT, 
 		    PeriodReturnNet   FLOAT, 
         bProcessed        BIT DEFAULT 0) 
+
+      CREATE TABLE #tmpHedgePerf(
+        AsOfDate          DATE,
+        BBYelloKey        VARCHAR(255),
+        NAV               FLOAT,
+        DeltaAdjMv        FLOAT,
+        PctOfNav          FLOAT,
+        DtdPerf           FLOAT,
+        PctOfPerf         FLOAT)
+
 
          INSERT INTO #tmpDateDetail( 
                 AsOfDate, 
@@ -61,13 +73,70 @@ CREATE PROCEDURE [dbo].[p_GetPerformanceDetails](
                 DailyReturn, 
 			          DailyReturnNet) 
          SELECT pdx.AsOfDate, 
-                pdx.Entity, 
+                @EntityName, 
 			          pdx.DailyReturn, 
-			     CASE WHEN Entity = 'AMF' THEN pdx.DailyReturn * 0.8 ELSE pdx.DailyReturn END 
+			          CASE WHEN Entity = 'AMF' THEN pdx.DailyReturn * 0.80 ELSE pdx.DailyReturn END 
            FROM dbo.PerformanceDetails pdx 
           WHERE pdx.AsOfDate BETWEEN @BegDate AND @EndDate 
-            AND pdx.Entity = @EntityName       
+            AND pdx.Entity = CASE WHEN @EntityName = 'AMF UNHEDGED' THEN 'AMF' ELSE @EntityName END
  
+
+        IF @EntityName = 'AMF UNHEDGED'
+          BEGIN
+            /*  ADD UNHEDGING LOGIC HERE   */
+                INSERT INTO #tmpHedgePerf(
+                       AsOfDate,
+                       BBYelloKey,
+                       NAV,
+                       DeltaAdjMv,
+                       PctOfNav) 
+                SELECT epd.AsOfDate,
+                       epd.BBYellowKey,
+                       fad.AssetValue AS NAV,
+                       epd.DeltaAdjMV,
+                       ABS(COALESCE(epd.DeltaAdjMV, 1) /  COALESCE(fad.AssetValue, 1)) AS PctOfNav
+                  FROM dbo.EnfPositionDetails epd
+                  JOIN dbo.FundAssetsDetails fad
+                    ON epd.AsOfDate = fad.AsOfDate         
+                 WHERE epd.AsOfDate BETWEEN @BegDate AND @EndDate 
+                   AND epd.BBYellowKey IN ('MSA1BIO Index', 'MSA1BIOH Index')
+                   AND fad.Entity = 'AMF NAV'
+                 ORDER BY epd.AsOfDate,
+                       epd.BBYellowKey
+
+                UPDATE thp
+                   SET thp.DtdPerf = pdx.DailyReturn
+                  FROM #tmpHedgePerf thp
+                  JOIN dbo.PerformanceDetails pdx
+                    ON pdx.Entity = thp.BBYelloKey
+                   AND pdx.AsOfDate = thp.AsOfDate
+
+                UPDATE thp
+                   SET thp.PctOfPerf = COALESCE(thp.PctOfNav, 0) * COALESCE(thp.DtdPerf, 0)
+                  FROM #tmpHedgePerf thp
+
+                /*
+                SELECT thp.AsOfDate,
+                       SUM(thp.PctOfPerf) AS HedgePerf 
+                  FROM #tmpHedgePerf thp
+                 GROUP BY thp.AsOfDate
+                */
+
+                UPDATE tpr
+                   SET tpr.DailyReturn = tpr.DailyReturn - hhx.HedgePerf
+                  FROM #tmpPerfReturnData tpr
+                  JOIN (SELECT thp.AsOfDate,
+                               SUM(thp.PctOfPerf) AS HedgePerf 
+                          FROM #tmpHedgePerf thp
+                         GROUP BY thp.AsOfDate) hhx
+                    ON tpr.AsOfDate = hhx.AsOfDate
+
+                UPDATE tpr
+                   SET tpr.DailyReturnNet = tpr.DailyReturn * 0.80
+                  FROM #tmpPerfReturnData tpr
+          END
+
+
 
     DECLARE @CalcDate           AS DATE 
 		DECLARE @PrevDate           AS DATE 
@@ -86,58 +155,58 @@ CREATE PROCEDURE [dbo].[p_GetPerformanceDetails](
             SELECT @CalcDate = NULL, @PrevDate = NULL, @PrevCompReturn = 0, @PrevCompReturnNet = 0 
  
             SELECT TOP 1 @CalcDate = prd.AsOfDate  
-			        FROM #tmpPerfReturnData prd  
-			       WHERE prd.bProcessed = 0  
-			       ORDER BY prd.AsOfDate ASC 
+			  FROM #tmpPerfReturnData prd  
+			 WHERE prd.bProcessed = 0  
+			 ORDER BY prd.AsOfDate ASC 
  
         /*  HOLIDAY MANAGEMENT  */
             IF EXISTS(SELECT 1 FROM #tmpDateDetail tdd WHERE tdd.AsOfDate = @CalcDate AND tdd.IsMktHoliday = 1) AND @bAggHolidays = 1 
 			        BEGIN							   
-                SELECT @HolidayRetVal = prd.DailyReturn, 
-					             @HolidayRetNetVal = prd.DailyReturnNet  
-				          FROM #tmpPerfReturnData prd  
-				         WHERE prd.AsOfDate = @CalcDate 
+                      SELECT @HolidayRetVal = prd.DailyReturn, 
+                             @HolidayRetNetVal = prd.DailyReturnNet  
+                        FROM #tmpPerfReturnData prd  
+                       WHERE prd.AsOfDate = @CalcDate 
                 
-				        DELETE prd 
-				          FROM #tmpPerfReturnData prd  
-				         WHERE prd.AsOfDate = @CalcDate 
-                       
-				        SELECT TOP 1 @PostHolidayDate = prd.AsOfDate  
-				          FROM #tmpPerfReturnData prd 
-				         WHERE prd.AsOfDate > @CalcDate 
-				           AND prd.bProcessed = 0 
-				         ORDER BY prd.AsOfDate ASC
+                      DELETE prd 
+                        FROM #tmpPerfReturnData prd  
+                       WHERE prd.AsOfDate = @CalcDate 
+                        
+                      SELECT TOP 1 @PostHolidayDate = prd.AsOfDate  
+                        FROM #tmpPerfReturnData prd 
+                       WHERE prd.AsOfDate > @CalcDate 
+                         AND prd.bProcessed = 0 
+                       ORDER BY prd.AsOfDate ASC
 
-				        SELECT TOP 1 @PreHolidayDate = prd.AsOfDate  
-				          FROM #tmpPerfReturnData prd 
-				         WHERE prd.AsOfDate < @CalcDate 
-				           AND prd.bProcessed = 1 
-				         ORDER BY prd.AsOfDate DESC
+                      SELECT TOP 1 @PreHolidayDate = prd.AsOfDate  
+                        FROM #tmpPerfReturnData prd 
+                       WHERE prd.AsOfDate < @CalcDate 
+                         AND prd.bProcessed = 1 
+                       ORDER BY prd.AsOfDate DESC
 
-                IF @PostHolidayDate IS NULL
-                  BEGIN
-                    SELECT DISTINCT TOP 1 @PostHolidayDate = pdx.AsOfDate 
-                      FROM dbo.PerformanceDetails pdx 
-                     WHERE pdx.AsOfDate > @CalcDate
-				             ORDER BY pdx.AsOfDate ASC
-                  END
+                        IF @PostHolidayDate IS NULL
+                          BEGIN
+                            SELECT DISTINCT TOP 1 @PostHolidayDate = pdx.AsOfDate 
+                              FROM dbo.PerformanceDetails pdx 
+                             WHERE pdx.AsOfDate > @CalcDate
+                             ORDER BY pdx.AsOfDate ASC
+                          END
 
-                IF MONTH(@PostHolidayDate) != MONTH(@CalcDate)
-                  BEGIN
-                    UPDATE prd 
-				               SET prd.DailyReturn = (((1 + prd.DailyReturn) * (1 + @HolidayRetVal))- 1), 
-					                 prd.DailyReturnNet = (((1 + prd.DailyReturnNet) * (1 + @HolidayRetNetVal)) - 1) 
-				              FROM #tmpPerfReturnData prd 
-				             WHERE prd.AsOfDate = @PreHolidayDate                   
-                  END
-                ELSE
-                  BEGIN
-                    UPDATE prd 
-				               SET prd.DailyReturn = (((1 + @HolidayRetVal) * (1 + prd.DailyReturn))- 1), 
-					                 prd.DailyReturnNet = (((1 + @HolidayRetNetVal) * (1 + prd.DailyReturnNet)) - 1) 
-				              FROM #tmpPerfReturnData prd 
-				             WHERE prd.AsOfDate = @PostHolidayDate    
-                  END
+                        IF MONTH(@PostHolidayDate) != MONTH(@CalcDate)
+                          BEGIN
+                            UPDATE prd 
+                               SET prd.DailyReturn = (((1 + prd.DailyReturn) * (1 + @HolidayRetVal))- 1), 
+                                   prd.DailyReturnNet = (((1 + prd.DailyReturnNet) * (1 + @HolidayRetNetVal)) - 1) 
+                              FROM #tmpPerfReturnData prd 
+                             WHERE prd.AsOfDate = @PreHolidayDate                   
+                          END
+                        ELSE
+                          BEGIN
+                            UPDATE prd 
+                               SET prd.DailyReturn = (((1 + @HolidayRetVal) * (1 + prd.DailyReturn))- 1), 
+                                   prd.DailyReturnNet = (((1 + @HolidayRetNetVal) * (1 + prd.DailyReturnNet)) - 1) 
+                              FROM #tmpPerfReturnData prd 
+                             WHERE prd.AsOfDate = @PostHolidayDate    
+                          END
 				      SELECT @CalcDate = @PostHolidayDate 
 			      END 
  
@@ -172,23 +241,23 @@ CREATE PROCEDURE [dbo].[p_GetPerformanceDetails](
 			       ORDER BY prd.AsOfDate DESC  
  
             IF @PrevDate IS NULL 
-			        BEGIN 
+			  BEGIN 
                 UPDATE prd 
                    SET prd.PeriodReturn = ((1 + prd.DailyReturn) - 1), 
-				               prd.PeriodReturnNet = ((1 + prd.DailyReturnNet) - 1), 
-			                 prd.bProcessed = 1 
+				       prd.PeriodReturnNet = ((1 + prd.DailyReturnNet) - 1), 
+			           prd.bProcessed = 1 
                   FROM #tmpPerfReturnData prd 
                  WHERE prd.AsOfDate = @CalcDate  
-			        END 
-			      ELSE 
+			  END 
+			ELSE 
               BEGIN
                 UPDATE prd 
                    SET prd.PeriodReturn = (((1 + prd.DailyReturn) * (1 + @PrevCompReturn)) - 1), 
-				               prd.PeriodReturnNet = (((1 + prd.DailyReturnNet) * (1 + @PrevCompReturnNet)) - 1), 
-			                 prd.bProcessed = 1 
+				       prd.PeriodReturnNet = (((1 + prd.DailyReturnNet) * (1 + @PrevCompReturnNet)) - 1), 
+			           prd.bProcessed = 1 
                   FROM #tmpPerfReturnData prd 
                  WHERE prd.AsOfDate = @CalcDate
-			        END 
+			  END 
           END 
 
     /*  ADD ANY DUMMY RECORDS TO COMPLETE MATRIX (SHOULD BE A PARAMETER)  */
@@ -214,17 +283,17 @@ CREATE PROCEDURE [dbo].[p_GetPerformanceDetails](
  
  
 		    UPDATE tpd 
-			     SET tpd.DailyRetLogNet = LOG(1 + tpd.DailyReturnNet) 
+			   SET tpd.DailyRetLogNet = LOG(1 + tpd.DailyReturnNet) 
 		      FROM #tmpPerfReturnData tpd  
 
  
     /*  THE LAST STEP FOR OUTPUT RECORDSETS (LOOK INTO REASON FOR "weekly")     */
         IF @OutputWeekly = 1
-		      BEGIN
+		  BEGIN
             SELECT * FROM #tmpPerfReturnData trd WHERE DATEPART(dw, trd.AsOfDate) = 6
           END
-		    ELSE
-		      BEGIN
+		ELSE
+		  BEGIN
             SELECT tpd.AsOfDate, 
 				           tpd.Entity, 
 				           tpd.DailyReturn, 
@@ -238,7 +307,3 @@ CREATE PROCEDURE [dbo].[p_GetPerformanceDetails](
 
     END 
 GO
-
-GRANT EXECUTE ON dbo.p_GetPerformanceDetails TO PUBLIC
-GO
-

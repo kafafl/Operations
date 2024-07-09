@@ -2,8 +2,10 @@ SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
+
 ALTER PROCEDURE [dbo].[p_GetShortBasketComplete]( 
-    @AsOfDate          DATE = NULL) 
+    @AsOfDate          DATE = NULL,
+    @rstOutput         INT = 1) 
  
  /* 
   Author:   Lee Kafafian 
@@ -11,6 +13,7 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
   Object:   p_GetShortBasketComplete 
   Example:  EXEC dbo.p_GetShortBasketComplete @AsOfDate = '06/03/2024'
             EXEC dbo.p_GetShortBasketComplete
+            EXEC dbo.p_GetShortBasketComplete @AsOfDate = '07/08/2024', @rstOutput = 2
  */ 
    
  AS  
@@ -44,15 +47,25 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
         AvgVolDate              DATE NULL,
         AvgVol30d               FLOAT NULL,
         AvgVol90d               FLOAT NULL,
-        AvgVol180d              FLOAT NULL, 
+        AvgVol180d              FLOAT NULL,
+        TheraAreaTag            VARCHAR(255),
+        TheraAreaDate           DATE, 
         bNoMktCap               BIT DEFAULT 0,
         bNoEntVal               BIT DEFAULT 0, 
         bNoPrice                BIT DEFAULT 0,
         bNoRebate               BIT DEFAULT 0,
         bInLongPort             BIT DEFAULT 0,
-        bInShortPort            BIT DEFAULT 0)         
+        bInShortPort            BIT DEFAULT 0)
+
+      CREATE TABLE #tmpPortTagging(
+        AsOfDate                DATE,
+        PositionId              VARCHAR(255),
+        TagReference            VARCHAR(255),
+        TagValue                VARCHAR(255),
+        TagTsUpdate             DATETIME)         
  
-      DECLARE @PortDate AS DATE 
+      DECLARE @PortDate AS DATE
+      DECLARE @TagDate AS DATE
  
       IF @AsOfDate IS NULL 
         BEGIN 
@@ -81,6 +94,8 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
              AvgVol30d,
              AvgVol90d,
              AvgVol180d,
+             TheraAreaTag,
+             TheraAreaDate,
              bNoMktCap,
              bNoEntVal,
              bNoPrice)  
@@ -129,7 +144,7 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
             UPDATE rdc 
                SET rdc.bNoPrice = 1 
               FROM #tmpBiotechMaster rdc 
-             WHERE COALESCE(rdc.Price, 0) <= .5                                               /*   GREATER THAN 50 cents     */
+             WHERE COALESCE(rdc.Price, 0) <= .5                                             /*   GREATER THAN 50 cents     */
         
         /*   REBATE FILTER              */
             UPDATE rdc 
@@ -155,6 +170,9 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
              WHERE CHARINDEX('Alpha Short', tpp.Strategy) != 0 
  
 
+
+    IF @rstOutput = 1
+      BEGIN
     /*  OUTPUT OF STORED PROCEDURE   */
          SELECT tbm.AsOfDate, 
                 tbm.BbgTicker, 
@@ -186,6 +204,68 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
           ORDER BY tbm.AsOfDate, 
                 tbm.BbgTicker, 
                 tbm.SecName
+      END
+
+    IF @rstOutput = 2
+      BEGIN
+
+    /*  ADDD TAGS  */
+        INSERT INTO #tmpPortTagging(
+               AsOfDate,
+               PositionId,
+               TagReference,
+               TagValue,
+               TagTsUpdate)
+        SELECT tat.AsOfDate,
+               tat.PositionId,
+               tat.TagReference,
+               tat.TagValue,
+               tat.CreatedOn 
+          FROM dbo.vw_TherapeuticAreaTags tat
+         WHERE tat.AsOfDate <= @AsOfDate
+
+        UPDATE tbm
+           SET tbm.TheraAreaTag = apt.TagValue,
+               tbm.TheraAreaDate = apt.AsOfDate
+          FROM #tmpBiotechMaster tbm
+          JOIN #tmpPortTagging apt
+            ON CHARINDEX(tbm.BbgTicker, apt.PositionId) != 0
+        
+
+    /*  OUTPUT OF STORED PROCEDURE   */
+         SELECT tbm.AsOfDate, 
+                tbm.BbgTicker, 
+                COALESCE(tbm.Ticker, RTRIM(LEFT(tbm.BbgTicker, CHARINDEX(' ', tbm.BbgTicker)))) AS Ticker, 
+                tbm.SecName,
+                tbm.Crncy,
+                tbm.CntryCode,
+                tbm.MrktCap,
+                tbm.EntVal, 
+                tbm.Price,
+                tbm.SLAvail, 
+                tbm.SLRate, 
+                tbm.SLType,
+                tbm.SLDate, 
+                tbm.AvgVol30d,
+                tbm.AvgVol90d,
+                tbm.AvgVol180d,
+                tbm.TheraAreaTag,
+                tbm.TheraAreaDate, 
+                tbm.bNoMktCap, 
+                tbm.bNoRebate, 
+                tbm.bNoPrice, 
+                tbm.bInLongPort, 
+                tbm.bInShortPort 
+           FROM #tmpBiotechMaster tbm 
+          WHERE tbm.bNoMktCap = 0 
+            AND tbm.bNoEntVal = 0 
+            AND tbm.bNoPrice = 0
+            AND tbm.bNoRebate = 0
+            AND tbm.bInLongPort = 0 
+          ORDER BY tbm.AsOfDate, 
+                tbm.BbgTicker, 
+                tbm.SecName
+      END
 
  
     SET NOCOUNT OFF 
