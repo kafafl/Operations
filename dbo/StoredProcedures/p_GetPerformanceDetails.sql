@@ -155,9 +155,9 @@ ALTER PROCEDURE [dbo].[p_GetPerformanceDetails](
             SELECT @CalcDate = NULL, @PrevDate = NULL, @PrevCompReturn = 0, @PrevCompReturnNet = 0 
  
             SELECT TOP 1 @CalcDate = prd.AsOfDate  
-			  FROM #tmpPerfReturnData prd  
-			 WHERE prd.bProcessed = 0  
-			 ORDER BY prd.AsOfDate ASC 
+			        FROM #tmpPerfReturnData prd  
+			       WHERE prd.bProcessed = 0  
+			       ORDER BY prd.AsOfDate ASC 
  
         /*  HOLIDAY MANAGEMENT  */
             IF EXISTS(SELECT 1 FROM #tmpDateDetail tdd WHERE tdd.AsOfDate = @CalcDate AND tdd.IsMktHoliday = 1) AND @bAggHolidays = 1 
@@ -244,8 +244,8 @@ ALTER PROCEDURE [dbo].[p_GetPerformanceDetails](
 			  BEGIN 
                 UPDATE prd 
                    SET prd.PeriodReturn = ((1 + prd.DailyReturn) - 1), 
-				       prd.PeriodReturnNet = ((1 + prd.DailyReturnNet) - 1), 
-			           prd.bProcessed = 1 
+				               prd.PeriodReturnNet = ((1 + prd.DailyReturnNet) - 1), 
+			                 prd.bProcessed = 1 
                   FROM #tmpPerfReturnData prd 
                  WHERE prd.AsOfDate = @CalcDate  
 			  END 
@@ -253,8 +253,8 @@ ALTER PROCEDURE [dbo].[p_GetPerformanceDetails](
               BEGIN
                 UPDATE prd 
                    SET prd.PeriodReturn = (((1 + prd.DailyReturn) * (1 + @PrevCompReturn)) - 1), 
-				       prd.PeriodReturnNet = (((1 + prd.DailyReturnNet) * (1 + @PrevCompReturnNet)) - 1), 
-			           prd.bProcessed = 1 
+				               prd.PeriodReturnNet = (((1 + prd.DailyReturnNet) * (1 + @PrevCompReturnNet)) - 1), 
+			                 prd.bProcessed = 1 
                   FROM #tmpPerfReturnData prd 
                  WHERE prd.AsOfDate = @CalcDate
 			  END 
@@ -283,17 +283,17 @@ ALTER PROCEDURE [dbo].[p_GetPerformanceDetails](
  
  
 		    UPDATE tpd 
-			   SET tpd.DailyRetLogNet = LOG(1 + tpd.DailyReturnNet) 
+			     SET tpd.DailyRetLogNet = LOG(1 + tpd.DailyReturnNet) 
 		      FROM #tmpPerfReturnData tpd  
 
  
     /*  THE LAST STEP FOR OUTPUT RECORDSETS (LOOK INTO REASON FOR "weekly")     */
         IF @OutputWeekly = 1
-		  BEGIN
+		      BEGIN
             SELECT * FROM #tmpPerfReturnData trd WHERE DATEPART(dw, trd.AsOfDate) = 6
           END
-		ELSE
-		  BEGIN
+		    ELSE
+		      BEGIN
             SELECT tpd.AsOfDate, 
 				           tpd.Entity, 
 				           tpd.DailyReturn, 

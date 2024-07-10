@@ -13,7 +13,7 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
   Object:   p_GetShortBasketComplete 
   Example:  EXEC p_GetAmfBiotechUniverse @AsOfDate = '06/12/2024'
             EXEC p_GetAmfBiotechUniverse @LowQualityFilter = 1
-            EXEC p_GetAmfBiotechUniverse @AsOfDate = '06/11/2024', @LowQualityFilter = 1
+            EXEC p_GetAmfBiotechUniverse @AsOfDate = '07/08/2024', @LowQualityFilter = 1
  */ 
    
  AS  
@@ -40,7 +40,9 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
         AvgVolDate              DATE NULL,
         AvgVol30d               FLOAT NULL,
         AvgVol90d               FLOAT NULL,
-        AvgVol180d              FLOAT NULL, 
+        AvgVol180d              FLOAT NULL,
+        TheraAreaTag            VARCHAR(255),
+        TheraAreaDate           DATE,
         bNoMktCap               BIT DEFAULT 0, 
         bNoPrice                BIT DEFAULT 0,
         bNoEntValue             BIT DEFAULT 0, 
@@ -55,14 +57,19 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
         FirstDate               DATE, 
         ShareChange             FLOAT, 
         StatusDet               VARCHAR(500)) 
+
+      CREATE TABLE #tmpPortTagging(
+        AsOfDate                DATE,
+        PositionId              VARCHAR(255),
+        TagReference            VARCHAR(255),
+        TagValue                VARCHAR(255),
+        TagTsUpdate             DATETIME)
  
       DECLARE @PortDate AS DATE
-      DECLARE @MktDataDate AS DATE
+      DECLARE @MktDataDate AS DATE      
+      DECLARE @TagDate AS DATE
  
-      IF @AsOfDate IS NULL 
-        BEGIN 
-          SELECT @AsOfDate = CAST(GETDATE() AS DATE) 
-        END 
+
  
       IF @AsOfDate IS NULL
         BEGIN
@@ -156,6 +163,29 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
          SET rdc.bNoPrice = 1 
         FROM #tmpRawDataCombined rdc 
        WHERE COALESCE(rdc.Price, 0) <= .1                       /*   $0.10 /  10 cents or more in price  */
+
+
+    /*  ADDD TAGS  */
+        INSERT INTO #tmpPortTagging(
+               AsOfDate,
+               PositionId,
+               TagReference,
+               TagValue,
+               TagTsUpdate)
+        SELECT tat.AsOfDate,
+               tat.PositionId,
+               tat.TagReference,
+               tat.TagValue,
+               tat.CreatedOn 
+          FROM dbo.vw_TherapeuticAreaTags tat
+         WHERE tat.AsOfDate <= @AsOfDate
+
+        UPDATE tbm
+           SET tbm.TheraAreaTag = apt.TagValue,
+               tbm.TheraAreaDate = apt.AsOfDate
+          FROM #tmpRawDataCombined tbm
+          JOIN #tmpPortTagging apt
+            ON CHARINDEX(tbm.BbgTicker, apt.PositionId) != 0
  
       IF @LowQualityFilter = 1
         BEGIN
@@ -176,6 +206,8 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
                    rdc.AvgVol30d,
                    rdc.AvgVol90d,
                    rdc.AvgVol180d,
+                   rdc.TheraAreaTag,
+                   rdc.TheraAreaDate,
                    rdc.bNoMktCap,
                    rdc.bNoPrice,
                    rdc.bNoEntValue
@@ -205,6 +237,8 @@ ALTER PROCEDURE [dbo].[p_GetAmfBiotechUniverse](
                    rdc.AvgVol30d,
                    rdc.AvgVol90d,
                    rdc.AvgVol180d,
+                   rdc.TheraAreaTag,
+                   rdc.TheraAreaDate,
                    rdc.bNoMktCap,
                    rdc.bNoPrice,
                    rdc.bNoEntValue
