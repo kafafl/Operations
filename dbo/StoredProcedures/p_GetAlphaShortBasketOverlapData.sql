@@ -1,3 +1,7 @@
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
  
 ALTER PROCEDURE [dbo].[p_GetAlphaShortBasketOverlapData]( 
     @AsOfDate   DATE NULL = DEFAULT ) 
@@ -6,10 +10,10 @@ ALTER PROCEDURE [dbo].[p_GetAlphaShortBasketOverlapData](
   Author:   Lee Kafafian 
   Crated:   06/02/2024 
   Object:   p_GetAlphaShortBasketOverlapData 
-  Example:  EXEC dbo.p_GetAlphaShortBasketOverlapData @AsOfDate = '05/30/2024' 
+  Example:  EXEC dbo.p_GetAlphaShortBasketOverlapData @AsOfDate = '07/09/2024' 
  */ 
    
- AS  
+AS  
  
    BEGIN 
  
@@ -29,7 +33,7 @@ ALTER PROCEDURE [dbo].[p_GetAlphaShortBasketOverlapData](
               FROM dbo.EnfPositionDetails epd 
               JOIN dbo.MspbBasketDetails mbd 
                 ON mbd.AsOfDate = epd.AsOfDate 
-               AND CHARINDEX(mbd.CompTicker, epd.BBYellowKey) != 0 
+               AND LTRIM(RTRIM(LEFT(mbd.CompTicker, CHARINDEX(' ', mbd.CompTicker)))) = LTRIM(RTRIM(LEFT(epd.BBYellowKey, CHARINDEX(' ', epd.BBYellowKey))))
              WHERE mbd.AsOfDate = @AsOfDate
                AND epd.StratName IN ('Alpha Short') 
                AND epd.InstrType = 'Equity' 
@@ -41,3 +45,6 @@ ALTER PROCEDURE [dbo].[p_GetAlphaShortBasketOverlapData](
     SET NOCOUNT OFF 
  
    END 
+
+GRANT EXECUTE ON dbo.p_GetAlphaShortBasketOverlapData TO PUBLIC
+GO

@@ -11,7 +11,9 @@ ALTER PROCEDURE dbo.p_GetBasketMostIlliquid(
   Author:   Lee Kafafian
   Crated:   05/28/2024
   Object:   p_GetBasketMostIlliquid
-  Example:  EXEC dbo.p_GetBasketMostIlliquid @AsOfDate = '06/26/2024', @TopN = 5 
+  Example:  EXEC dbo.p_GetBasketMostIlliquid @AsOfDate = '07/09/2024', @TopN = 5 
+            EXEC dbo.p_GetBasketMostIlliquid @TopN = 5 
+ 
  */
   
  AS 
@@ -36,6 +38,7 @@ ALTER PROCEDURE dbo.p_GetBasketMostIlliquid(
       CompName               VARCHAR(255),
       Shares                 FLOAT,
       AvgVolume30d           FLOAT,
+      Price                  FLOAT,
       ADV30Day               FLOAT,
       bUpdated               BIT NOT NULL DEFAULT 0)
 
@@ -59,7 +62,7 @@ ALTER PROCEDURE dbo.p_GetBasketMostIlliquid(
        FROM dbo.AmfMarketData mkd
       WHERE mkd.DataSource = 'Bloomberg'
         AND mkd.PositionIdType  = 'BloombergTicker'
-        AND mkd.TagMnemonic = 'VOLUME_AVG_10D'
+        AND mkd.TagMnemonic = 'VOLUME_AVG_30D'
       ORDER BY mkd.AsOfDate DESC
 
 
@@ -80,11 +83,21 @@ ALTER PROCEDURE dbo.p_GetBasketMostIlliquid(
             tbl.bUpdated = 1
        FROM #tmpBasketLiquidity tbl
        JOIN dbo.AmfMarketData mkd
-         ON CHARINDEX(tbl.CompName, mkd.PositionId) != 0
+         ON LTRIM(RTRIM(LEFT(tbl.CompName, CHARINDEX(' ', tbl.CompName)))) = LTRIM(RTRIM(LEFT(mkd.PositionId, CHARINDEX(' ', mkd.PositionId)))) 
       WHERE mkd.AsOfDate = @MktDate
         AND mkd.DataSource = 'Bloomberg'
         AND mkd.PositionIdType  = 'BloombergTicker'
-        AND mkd.TagMnemonic = 'VOLUME_AVG_10D'
+        AND mkd.TagMnemonic = 'VOLUME_AVG_30D'
+
+     UPDATE tbl
+        SET tbl.Price = mkd.MdValue
+       FROM #tmpBasketLiquidity tbl
+       JOIN dbo.AmfMarketData mkd
+         ON LTRIM(RTRIM(LEFT(tbl.CompName, CHARINDEX(' ', tbl.CompName)))) = LTRIM(RTRIM(LEFT(mkd.PositionId, CHARINDEX(' ', mkd.PositionId)))) 
+      WHERE mkd.AsOfDate = @MktDate
+        AND mkd.DataSource = 'Bloomberg'
+        AND mkd.PositionIdType  = 'BloombergTicker'
+        AND mkd.TagMnemonic = 'LAST_PRICE'
 
      SELECT TOP 5
             tbl.AsOfDate,
@@ -92,6 +105,7 @@ ALTER PROCEDURE dbo.p_GetBasketMostIlliquid(
             tbl.CompName AS Ticker,
             tbl.Shares,
             tbl.AvgVolume30d,
+            COALESCE(tbl.Price, 0) * COALESCE(tbl.AvgVolume30d, 0) AS ADV30D$$,
             tbl.ADV30Day,
             @MktDate AS VolumeDate 
        FROM #tmpBasketLiquidity tbl
@@ -106,18 +120,3 @@ GO
 
 GRANT EXECUTE ON dbo.p_GetBasketMostIlliquid TO PUBLIC
 GO
-
-
-
-/*
-    SELECT tbl.AsOfDate,
-           tbl.BasketName AS Basket,
-           tbl.CompName AS Ticker,
-           tbl.Shares,
-           tbl.AvgVolume30d,
-           tbl.ADV30Day 
-      FROM #tmpBasketLiquidity tbl
-     WHERE tbl.ADV30Day IS NULL
-     ORDER BY tbl.ADV30Day ASC
-*/
-
