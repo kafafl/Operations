@@ -216,13 +216,24 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
                TagReference,
                TagValue,
                TagTsUpdate)
-        SELECT tat.AsOfDate,
-               tat.PositionId,
-               tat.TagReference,
-               tat.TagValue,
-               tat.CreatedOn 
-          FROM dbo.vw_TherapeuticAreaTags tat
-         WHERE tat.AsOfDate <= @AsOfDate
+        SELECT tag.AsOfDate,
+               tag.PositionId,
+               tag.TagReference,
+               tag.TagValue,
+               tag.CreatedOn
+          FROM dbo.vw_TherapeuticAreaTags tag
+          JOIN (SELECT MAX(tat.AsOfDate) AS AsOfDate,
+                       tat.PositionId,
+                       MAX(tat.CreatedOn) AS CreatedOn,
+                       COUNT(tat.PositionId) AS xCount
+                  FROM dbo.vw_TherapeuticAreaTags tat
+                 WHERE tat.AsOfDate <= @AsOfDate 
+                 GROUP BY tat.PositionId
+                HAVING MAX(tat.CreatedOn) = MAX(tat.CreatedOn)) tax
+                    ON tag.AsOfDate = tax.AsOfDate
+                   AND tag.PositionId = tax.PositionId
+                   AND tag.CreatedOn = tax.CreatedOn
+         ORDER BY tag.PositionId  
 
         UPDATE tbm
            SET tbm.TheraAreaTag = apt.TagValue,
@@ -270,4 +281,8 @@ ALTER PROCEDURE [dbo].[p_GetShortBasketComplete](
  
     SET NOCOUNT OFF 
   END 
+GO
+
+
+GRANT EXECUTE ON [dbo].[p_GetShortBasketComplete] TO PUBLIC
 GO
