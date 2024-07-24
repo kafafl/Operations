@@ -1,4 +1,9 @@
-CREATE PROCEDURE dbo.p_GetLongPortfolio(
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[p_GetLongPortfolio](
     @AsOfDate          DATE = NULL)
  
 
@@ -93,7 +98,7 @@ CREATE PROCEDURE dbo.p_GetLongPortfolio(
         UPDATE tpo
            SET tpo.PosLong = COALESCE(tpo.PosLong, 0),
                tpo.PosShort = COALESCE(tpo.PosShort, 0),
-               tpo.PosNet = COALESCE(tpo.PosLong, 0) - COALESCE(tpo.PosShort, 0)
+               tpo.PosNet = COALESCE(tpo.PosLong, 0) + COALESCE(tpo.PosShort, 0)
           FROM #tmpPortOutput tpo
     
 
@@ -103,7 +108,4 @@ CREATE PROCEDURE dbo.p_GetLongPortfolio(
 
     SET NOCOUNT OFF
   END
-GO
-
-GRANT EXECUTE ON dbo.p_GetLongPortfolio TO PUBLIC
 GO
