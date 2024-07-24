@@ -22,7 +22,7 @@ ALTER PROCEDURE [dbo].[p_GetProfLossByPosition](
 
             EXEC dbo.p_GetProfLossByPosition @AsOfDate = '6/28/2024'
             EXEC dbo.p_GetProfLossByPosition @AsOfDate = '6/28/2024', @iTopNCount = 400, @iRst = 1, @iHierarchy = 1, @iOrder = 2
-            EXEC dbo.p_GetProfLossByPosition @AsOfDate = '6/28/2024', @StrtDate = '04/30/2024', @iTopNCount = 400, @iRst = 5, @iHierarchy = 1, @iOrder = 5
+            EXEC dbo.p_GetProfLossByPosition @AsOfDate = '05/31/2024', @StrtDate = '01/01/2024', @iTopNCount = 400, @iRst = 5, @iHierarchy = 1, @iOrder = 5
  */
   
  AS 
@@ -222,21 +222,27 @@ ALTER PROCEDURE [dbo].[p_GetProfLossByPosition](
                    EXEC dbo.p_GetEnfPositionData @AsOfDate = @StrtDate, @ResultSet = 0
               END
 
-    DELETE tps FROM #tmpProfLossPos tps WHERE tps.BookName = '' AND tps.StratName = ''
-    DELETE tps FROM #tmpProfLossPos tps WHERE RTRIM(LTRIM(tps.BBYellowKey)) = ''
 
-    DELETE tps FROM #tmpProfLossPosPtd tps WHERE tps.BookName = '' AND tps.StratName = ''
-    DELETE tps FROM #tmpProfLossPosPtd tps WHERE RTRIM(LTRIM(tps.BBYellowKey)) = ''
+        DELETE tps FROM #tmpProfLossPos tps WHERE tps.BookName = '' AND tps.StratName = ''
+        DELETE tps FROM #tmpProfLossPos tps WHERE RTRIM(LTRIM(tps.BBYellowKey)) = ''
 
-    DELETE tps FROM #tmpProfLossPos tps WHERE tps.BookName IS NULL AND tps.StratName IS NULL
-    DELETE tps FROM #tmpProfLossPos tps WHERE tps.BBYellowKey IS NULL
+        DELETE tps FROM #tmpProfLossPosPtd tps WHERE tps.BookName = '' AND tps.StratName = ''
+        DELETE tps FROM #tmpProfLossPosPtd tps WHERE RTRIM(LTRIM(tps.BBYellowKey)) = ''
 
-    DELETE tps FROM #tmpProfLossPosPtd tps WHERE tps.BookName IS NULL AND tps.StratName IS NULL
-    DELETE tps FROM #tmpProfLossPosPtd tps WHERE tps.BBYellowKey IS NULL
+        DELETE tps FROM #tmpProfLossPos tps WHERE tps.BookName IS NULL AND tps.StratName IS NULL
+        DELETE tps FROM #tmpProfLossPos tps WHERE tps.BBYellowKey IS NULL
 
-    UPDATE tps SET tps.BBYellowKey = tps.UnderlyBBYellowKey FROM #tmpProfLossPos tps WHERE tps.InstrType IN ('Equity')
-    UPDATE tps SET tps.BBYellowKey = tps.UnderlyBBYellowKey FROM #tmpProfLossPosPtd tps WHERE tps.InstrType IN ('Equity')
+        DELETE tps FROM #tmpProfLossPosPtd tps WHERE tps.BookName IS NULL AND tps.StratName IS NULL
+        DELETE tps FROM #tmpProfLossPosPtd tps WHERE tps.BBYellowKey IS NULL
 
+        UPDATE tps SET tps.BBYellowKey = tps.UnderlyBBYellowKey FROM #tmpProfLossPos tps WHERE tps.InstrType IN ('Equity')
+        UPDATE tps SET tps.BBYellowKey = tps.UnderlyBBYellowKey FROM #tmpProfLossPosPtd tps WHERE tps.InstrType IN ('Equity')
+
+
+        /*
+        SELECT * FROM #tmpProfLossPos WHERE BBYellowKey = '4568 JP Equity'
+        SELECT * FROM #tmpProfLossPosPtd WHERE BBYellowKey = '4568 JP Equity'
+        */
 
         INSERT INTO #tmpResultsOut(
                AsOfDate,
@@ -391,59 +397,42 @@ ALTER PROCEDURE [dbo].[p_GetProfLossByPosition](
 
       END
 
-DELETE tro FROM #tmpResultsOut tro WHERE tro.BBYellowKey = ''
-DELETE trx FROM #tmpResultsOut trx WHERE trx.BBYellowKey = ''
-
-/*
-
-SELECT * FROM #tmpResultsOut WHERE BBYellowKey = 'WVE US Equity'
-SELECT * FROM #tmpResultsOutPtd WHERE BBYellowKey = 'WVE US Equity'
+    DELETE tro FROM #tmpResultsOut tro WHERE tro.BBYellowKey = ''
+    DELETE trx FROM #tmpResultsOut trx WHERE trx.BBYellowKey = ''
 
 
-SELECT @StrtDate AS StrtDate, @AsOfDate AS AsOfDate
+      /*
+      SELECT * FROM #tmpResultsOut WHERE BBYellowKey = '4568 JP Equity'
+      SELECT * FROM #tmpResultsOutPtd WHERE BBYellowKey = '4568 JP Equity'
 
+      SELECT tps.*,
+              tpx.*
+                FROM #tmpResultsOut tps
+                LEFT JOIN #tmpResultsOutPtd tpx
+                  ON tps.FundShortName = tpx.FundShortName
+                AND tps.StratName = tpx.StratName
+                AND tps.BookName = tpx.BookName
+                AND tps.InstDescr = tpx.InstDescr
+                AND tps.BBYellowKey = tpx.BBYellowKey
+      WHERE tps.BBYellowKey = '4568 JP Equity'
 
+      SELECT @StrtDate AS StrtDate, @AsOfDate AS AsOfDate
 
- SELECT tps.AsOfDate,
-        tpx.AsOfDate,
-        tps.BBYellowKey,
-        tpx.BBYellowKey, 
-       tps.PtdPnlUsd, 
-       COALESCE(tps.ItdPnlUsd, 0) AS RegITD,
-       COALESCE(tpx.ItdPnlUsd, 0) AS PreITD
-          FROM #tmpResultsOut tps
-          JOIN #tmpResultsOutPtd tpx
-            ON tps.FundShortName = tpx.FundShortName
-           AND tps.StratName = tpx.StratName
-           AND tps.BookName = tpx.BookName
-           AND tps.InstDescr = tpx.InstDescr
-           AND tps.InstrType = tpx.InstrType
-           AND tps.BBYellowKey = tpx.BBYellowKey
-RETURN
-*/
+      RETURN
+      */
+
 
     IF @StrtDate != @AsOfDate
       BEGIN
-
         UPDATE tps
-           SET tps.PtdPnlUsd = COALESCE(tps.ItdPnlUsd, 0) - COALESCE(tpx.ItdPnlUsd, 0)
+           SET tps.PtdPnlUsd = ROUND(COALESCE(tps.ItdPnlUsd, 0) - COALESCE(tpx.ItdPnlUsd, 0), 0)
           FROM #tmpResultsOut tps
           LEFT JOIN #tmpResultsOutPtd tpx
             ON tps.FundShortName = tpx.FundShortName
            AND tps.StratName = tpx.StratName
            AND tps.BookName = tpx.BookName
            AND tps.InstDescr = tpx.InstDescr
-           AND tps.InstrType = tpx.InstrType
            AND tps.BBYellowKey = tpx.BBYellowKey
-           /*
-           AND COALESCE(tps.ItdPnlUsd, 0) != COALESCE(tpx.ItdPnlUsd, 0)
-         WHERE (COALESCE(tps.ItdPnlUsd, 0) != 0 OR COALESCE(tpx.ItdPnlUsd, 0) != 0)
-         */
-
-         UPDATE tps
-            SET tps.PtdPnlUSd = 0
-           FROM #tmpResultsOut tps
-           WHERE tps.PtdPnlUsd IS NULL
       END
 
         UPDATE tro
