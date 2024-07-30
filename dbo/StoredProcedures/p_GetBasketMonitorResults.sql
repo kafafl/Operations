@@ -1,11 +1,18 @@
-CREATE PROCEDURE [dbo].[p_GetBasketMonitorResults](
-  @AsOfDate       DATE NULL = DEFAULT)
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER PROCEDURE [dbo].[p_GetBasketMonitorResults](
+  @AsOfDate       DATE NULL = DEFAULT,
+  @BasketName     VARCHAR(255) = 'MSA1BIOH')
 
    /*
-  Author:   Lee Kafafian
-  Crated:   05/28/2024
-  Object:   p_GetBasketMonitorResults
-  Example:  EXEC dbo.p_GetBasketMonitorResults 
+        Author:   Lee Kafafian
+        Crated:   05/28/2024
+        Object:   p_GetBasketMonitorResults
+        Example:  EXEC dbo.p_GetBasketMonitorResults @BasketName = 'MSA1BIOH'
+                  EXEC dbo.p_GetBasketMonitorResults @BasketName = 'MSA14568'
  */
   
  AS 
@@ -13,7 +20,6 @@ CREATE PROCEDURE [dbo].[p_GetBasketMonitorResults](
    BEGIN
 
    SET NOCOUNT ON
-
 
     CREATE TABLE #tmpProcessRaw(
       Iid                BIGINT NOT NULL,
@@ -43,9 +49,8 @@ CREATE PROCEDURE [dbo].[p_GetBasketMonitorResults](
       DECLARE @Tomorrow AS DATE = DATEADD(d, 1, @AsOfDate)
       DECLARE @PostTickerTextMA AS VARCHAR(5000) = 'Equity that announced an M&A transaction today.'
       DECLARE @PostTickerText AS VARCHAR(5000) = 'Equity that is held by Allostery.'
-      DECLARE @PreTickerText AS VARCHAR(5000) = 'Basket: MSA1BIOH Index has a constituent:'
+      DECLARE @PreTickerText AS VARCHAR(5000) = 'Basket: ' + @BasketName + ' Index has a constituent:'
       DECLARE @PostTickerTextPxChange AS VARCHAR(5000) = 'Equity with greater than a 50% two-day price move.'
-      DECLARE @BasketName AS VARCHAR(255) = ' MSA1BIOH'
       DECLARE @pId AS BIGINT
 
 
@@ -64,8 +69,9 @@ CREATE PROCEDURE [dbo].[p_GetBasketMonitorResults](
               msg.MsgValue,
               msg.MsgPriority,
               msg.MsgInTs
-          FROM dbo.MsgQueue msg
+         FROM dbo.MsgQueue msg
         WHERE msg.MsgInTs BETWEEN @AsOfDate AND @Tomorrow
+          AND RTRIM(LTRIM(REPLACE(SUBSTRING(msg.MsgValue, CHARINDEX('Basket:', msg.MsgValue), CHARINDEX('Index', msg.MsgValue) - 1), 'Basket:', ''))) = @BasketName
           AND CHARINDEX('Basket Monitor', msg.MsgCatagory) != 0
         ORDER BY msg.MsgInTs DESC
 
@@ -156,7 +162,7 @@ CREATE PROCEDURE [dbo].[p_GetBasketMonitorResults](
       SELECT @CategoryAlphaOverlap,
             @SubcategoryAlphaOverlap,
             @BasketName,
-            @ConcatAlphaOverlap,
+            CASE WHEN @ConcatAlphaOverlap = '' THEN  'None' ELSE @ConcatAlphaOverlap END,
             @OrderIdAlphaOverlap
 
 
