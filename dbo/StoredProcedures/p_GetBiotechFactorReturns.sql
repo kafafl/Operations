@@ -61,6 +61,8 @@ ALTER PROCEDURE [dbo].[p_GetBiotechFactorReturns](
           AvgVol30d               FLOAT NULL,
           AvgVol90d               FLOAT NULL,
           AvgVol180d              FLOAT NULL, 
+          TheraAreaTag            VARCHAR(255) NULL,
+          TheraAreaDate           DATE,
           bNoMktCap               BIT DEFAULT 0,
           bNoEntVal               BIT DEFAULT 0, 
           bNoPrice                BIT DEFAULT 0, 
@@ -144,10 +146,12 @@ ALTER PROCEDURE [dbo].[p_GetBiotechFactorReturns](
                     AvgVol30d,
                     AvgVol90d,
                     AvgVol180d,
+                    TheraAreaTag,
+                    TheraAreaDate,
                     bNoMktCap,
                     bNoPrice,
                     bNoEntValue)  
-               EXEC p_GetAmfBiotechUniverse @AsOfDate = @AsOfDate, @LowQualityFilter = 1
+               EXEC dbo.p_GetAmfBiotechUniverse @AsOfDate = @AsOfDate, @LowQualityFilter = 1
 
 
     /*  RETURN THESE RESULTS  */
@@ -183,6 +187,7 @@ ALTER PROCEDURE [dbo].[p_GetBiotechFactorReturns](
     SET NOCOUNT OFF 
   END 
 GO
+
 
 
 
