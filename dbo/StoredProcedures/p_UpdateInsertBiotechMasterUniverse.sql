@@ -1,7 +1,10 @@
-ALTER PROCEDURE dbo.p_UpdateInsertBiotechMasterUniveres(
+ALTER PROCEDURE dbo.p_UpdateInsertBiotechMasterUniverse(
     @AsOfDate              DATE,
     @strBbgTicker          VARCHAR(255),
     @SecName               VARCHAR(255),
+    @GICS_sector           VARCHAR(255),
+    @GICS_industry         VARCHAR(255),
+    @Crncy                 VARCHAR(255),
     @MktCap                FLOAT,
     @EntVal                FLOAT,
     @Price                 FLOAT,
@@ -15,8 +18,8 @@ ALTER PROCEDURE dbo.p_UpdateInsertBiotechMasterUniveres(
  /*
   Author:   Lee Kafafian
   Crated:   05/16/2024
-  Object:   p_UpdateInsertBiotechMasterUniveres
-  Example:  EXEC dbo.p_UpdateInsertBiotechMasterUniveres @AsOfDate...
+  Object:   p_UpdateInsertBiotechMasterUniverse
+  Example:  EXEC dbo.p_UpdateInsertBiotechMasterUniverse @AsOfDate...
  */
   
  AS 
@@ -29,6 +32,9 @@ ALTER PROCEDURE dbo.p_UpdateInsertBiotechMasterUniveres(
                AsOfDate,
                BbgTicker,
                SecName,
+               GICS_sector,
+               GICS_industry,
+               Crncy,
                MarketCap,
                EnterpriseValue,
                Price,
@@ -40,6 +46,9 @@ ALTER PROCEDURE dbo.p_UpdateInsertBiotechMasterUniveres(
         SELECT @AsOfDate,
                @strBbgTicker,
                @SecName,
+               @GICS_sector,
+               @GICS_industry,
+               @Crncy,
                CASE WHEN @MktCap = @NullCheck THEN NULL ELSE @MktCap END,
                CASE WHEN @EntVal = @NullCheck THEN NULL ELSE @EntVal END,
                CASE WHEN @Price = @NullCheck THEN NULL ELSE @Price END,
@@ -53,5 +62,5 @@ ALTER PROCEDURE dbo.p_UpdateInsertBiotechMasterUniveres(
   END
 GO
 
-GRANT EXECUTE ON dbo.p_UpdateInsertBiotechMasterUniveres TO PUBLIC
+GRANT EXECUTE ON dbo.p_UpdateInsertBiotechMasterUniverse TO PUBLIC
 GO
