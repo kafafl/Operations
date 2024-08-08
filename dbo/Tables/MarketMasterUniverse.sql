@@ -39,3 +39,10 @@ SET ANSI_NULLS OFF
 GO
 SET QUOTED_IDENTIFIER OFF
 GO
+
+
+ALTER TABLE dbo.MarketMasterUniverse ADD   [IdCUSIP]                    VARCHAR(255)  NULL
+GO
+
+ALTER TABLE dbo.MarketMasterUniverse ADD     [IdSEDOL]                  VARCHAR(255)  NULL
+GO

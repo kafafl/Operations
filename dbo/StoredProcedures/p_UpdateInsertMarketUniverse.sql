@@ -13,7 +13,9 @@ ALTER PROCEDURE dbo.p_UpdateInsertMarketUniverse(
     @PEValue               FLOAT,
     @TotRetYtd             FLOAT,
     @RevenueT12M           FLOAT,
-    @EPS                   FLOAT)
+    @EPS                   FLOAT,
+    @CUSIP                 VARCHAR(255),
+    @SEDOL                 VARCHAR(255))
  
  
  /*
@@ -46,7 +48,9 @@ ALTER PROCEDURE dbo.p_UpdateInsertMarketUniverse(
                PEValue,
                TotalReturnYTD,
                RevenueT12M,
-               EPST12M) 
+               EPST12M,
+               IdCUSIP,
+               IdSEDOL) 
         SELECT @AsOfDate,
                @ParentEntity,
                @strBbgTicker,
@@ -61,7 +65,9 @@ ALTER PROCEDURE dbo.p_UpdateInsertMarketUniverse(
                CASE WHEN @PEValue = @NullCheck THEN NULL ELSE @PEValue END,
                CASE WHEN @TotRetYtd = @NullCheck THEN NULL ELSE @TotRetYtd END,
                CASE WHEN @RevenueT12M = @NullCheck THEN NULL ELSE @RevenueT12M END,
-               CASE WHEN @EPS = @NullCheck THEN NULL ELSE @EPS END
+               CASE WHEN @EPS = @NullCheck THEN NULL ELSE @EPS END,
+               @CUSIP,
+               @SEDOL
 
     SET NOCOUNT OFF
   END

@@ -245,6 +245,7 @@ ALTER PROCEDURE [dbo].[p_GetBasketMonitorResults](
    END
 GO
 
+
    GRANT EXECUTE ON dbo.p_GetBasketMonitorResults TO PUBLIC
    GO
 

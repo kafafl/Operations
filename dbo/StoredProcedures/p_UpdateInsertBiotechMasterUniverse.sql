@@ -12,7 +12,9 @@ ALTER PROCEDURE dbo.p_UpdateInsertBiotechMasterUniverse(
     @PEValue               FLOAT,
     @TotRetYtd             FLOAT,
     @RevenueT12M           FLOAT,
-    @EPS                   FLOAT)
+    @EPS                   FLOAT,
+    @CUSIP                 VARCHAR(255),
+    @SEDOL                 VARCHAR(255))
  
  
  /*
@@ -42,7 +44,9 @@ ALTER PROCEDURE dbo.p_UpdateInsertBiotechMasterUniverse(
                PEValue,
                TotalReturnYTD,
                RevenueT12M,
-               EPST12M) 
+               EPST12M,
+               IdCUSIP,
+               IdSEDOL) 
         SELECT @AsOfDate,
                @strBbgTicker,
                @SecName,
@@ -56,7 +60,9 @@ ALTER PROCEDURE dbo.p_UpdateInsertBiotechMasterUniverse(
                CASE WHEN @PEValue = @NullCheck THEN NULL ELSE @PEValue END,
                CASE WHEN @TotRetYtd = @NullCheck THEN NULL ELSE @TotRetYtd END,
                CASE WHEN @RevenueT12M = @NullCheck THEN NULL ELSE @RevenueT12M END,
-               CASE WHEN @EPS = @NullCheck THEN NULL ELSE @EPS END
+               CASE WHEN @EPS = @NullCheck THEN NULL ELSE @EPS END,
+               @CUSIP,
+               @SEDOL
 
     SET NOCOUNT OFF
   END

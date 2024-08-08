@@ -17,7 +17,9 @@ ALTER PROCEDURE [dbo].[p_RunDailyPositionRecReports](
 
             EXEC dbo.p_RunDailyPositionRecReports @AsOfDate = '07/17/2024', @RstOutput = 1, @Strategy = 'Alpha Short'
 
-            EXEC dbo.p_RunDailyPositionRecReports @AsOfDate = '07/17/2024', @RstOutput = 1, @Strategy = 'All'
+            EXEC dbo.p_RunDailyPositionRecReports @AsOfDate = '07/18/2024', @RstOutput = 1, @Strategy = 'All'
+
+            EXEC dbo.p_RunDailyPositionRecReports @AsOfDate = '07/18/2024', @RstOutput = 2, @Strategy = 'All'
  
  */
 
@@ -669,7 +671,7 @@ RETURN
     SELECT @AsOfDate,
            'Total' AS Strategy,
            'Total' AS BBYellowKey,
-           -1
+           100
 
 
     UPDATE tpr
@@ -717,9 +719,9 @@ RETURN
            MspbYtdPnlUsd,
            EnfYtdPnlUsd)
     SELECT @AsOfDate,
-          'ROW TOTALS' AS Strategy,
-          'ROW TOTALS' AS BBYellowKey,
-          100,
+          'Positions' AS Strategy,
+          'Positions' AS BBYellowKey,
+          10,
           SUM(MspbQuantity),
           SUM(EnfQuantity),
           SUM(MspbDtdPnlUsd),
@@ -759,12 +761,19 @@ RETURN
      FROM #tmpPortfolioRec tp1
      JOIN #tmpPortfolioRec tp2
        ON tp1.AsOfDate = tp2.AsOfDate
-    WHERE tp1.iSort = -1
-      AND tp2.iSort = 100
+    WHERE tp1.iSort = 100
+      AND tp2.iSort = 10
 
-
-    DELETE tpr FROM #tmpPortfolioRec tpr WHERE tpr.iSort = 100
-
+    IF @RstOutput = 1
+      BEGIN
+        DELETE tpr FROM #tmpPortfolioRec tpr WHERE tpr.iSort IN (10, 99, 100)
+      END
+    
+    
+    IF @RstOutput = 2
+      BEGIN
+        DELETE tpr FROM #tmpPortfolioRec tpr WHERE tpr.iSort IN (1, 2, 3, 4)
+      END
 
     SELECT tpr.AsOfDate,
            tpr.Strategy,
@@ -798,6 +807,7 @@ RETURN
   END
 
 GO
+
 
 
 GRANT EXECUTE ON [dbo].[p_RunDailyPositionRecReports] TO PUBLIC

@@ -39,9 +39,15 @@ GO
 
 
 
-ALTER TABLE dbo.BiotechMasterUniverse ADD   [GICS_sector]                    VARCHAR(255) NOT NULL
+ALTER TABLE dbo.BiotechMasterUniverse ADD   [GICS_sector]                    VARCHAR(255)  NULL
 GO
 
-ALTER TABLE dbo.BiotechMasterUniverse ADD     [GICS_industry]                  VARCHAR(255) NOT NULL
+ALTER TABLE dbo.BiotechMasterUniverse ADD     [GICS_industry]                  VARCHAR(255)  NULL
+GO
+
+ALTER TABLE dbo.BiotechMasterUniverse ADD   [IdCUSIP]                    VARCHAR(255)  NULL
+GO
+
+ALTER TABLE dbo.BiotechMasterUniverse ADD     [IdSEDOL]                  VARCHAR(255)  NULL
 GO
 
