@@ -11,7 +11,7 @@ ALTER PROCEDURE [dbo].[p_GetLongPortfolio](
   Author:   Lee Kafafian
   Crated:   05/08/2024
   Object:   p_GetLongPortfolio
-  Example:  EXEC dbo.p_GetLongPortfolio @AsOfDate = '04/25/2024', 
+  Example:  EXEC dbo.p_GetLongPortfolio @AsOfDate = '07/25/2024', 
  */
   
  AS 
