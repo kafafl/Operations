@@ -46,7 +46,7 @@ ALTER PROCEDURE [dbo].[p_GetAmfBasketDetails](
             SlRateType         VARCHAR(255))
 
 
-        CREATE TABLE #tmpSLAvail(
+          CREATE TABLE #tmpSLAvail(
             AsOfDate           DATE,
             BbgTicker          VARCHAR(500),
             SecName            VARCHAR(500),
@@ -61,9 +61,9 @@ ALTER PROCEDURE [dbo].[p_GetAmfBasketDetails](
 
 
         IF @AsOfDate IS NULL
-        BEGIN
+          BEGIN
             SELECT @AsOfDate = CAST(GETDATE() AS DATE)
-        END
+          END
 
 
          INSERT INTO #tmpBasketOutput(
@@ -97,7 +97,7 @@ ALTER PROCEDURE [dbo].[p_GetAmfBasketDetails](
                 mspb.CompSEDOL,
                 mspb.CompISIN,
                 mspb.Divisor,
-                mspb.BasketPrice,
+                mspb.BasketMarkPrice,
                 mspb.BasketNotional,
                 mspb.ExpNotional,
                 LTRIM(RTRIM(LEFT(mspb.CompBbg, CHARINDEX(' ', mspb.CompBbg))))
@@ -117,15 +117,14 @@ ALTER PROCEDURE [dbo].[p_GetAmfBasketDetails](
             DECLARE @AsOfVol AS DATE
             
             SELECT TOP 1 @AsOfSl = msa.AsOfDate FROM dbo.MspbSLAvailability msa WHERE msa.AsOfDate <= @AsOfDate ORDER BY msa.AsOfDate DESC
-            PRINT( CAST(@AsOfSl AS VARCHAR(255)))
             SELECT TOP 1 @AsOfBmu = bmu.AsOfDate FROM dbo.BiotechMasterUniverse bmu WHERE bmu.AsOfDate <= @AsOfSl ORDER BY bmu.AsOfDate DESC
-            PRINT( CAST(@AsOfBmu AS VARCHAR(255)))
+
             SELECT TOP 1 @AsOfVol = amd.AsOfDate
-            FROM dbo.AmfMarketData amd
-            WHERE amd.PositionIdType = 'BloombergTicker'
-            AND amd.DataSource = 'Bloomberg'
-            AND amd.AsOfDate <= @AsOfDate
-            ORDER BY amd.AsOfDate DESC
+              FROM dbo.AmfMarketData amd
+             WHERE amd.PositionIdType = 'BloombergTicker'
+               AND amd.DataSource = 'Bloomberg'
+               AND amd.AsOfDate <= @AsOfDate
+             ORDER BY amd.AsOfDate DESC
 
 
         /*  BEGIN STOCK LOAN AVAILABILITY CARVE OUT  */
@@ -138,79 +137,78 @@ ALTER PROCEDURE [dbo].[p_GetAmfBasketDetails](
                     IdSedol,
                     IdCusip,
                     UpdateDate)
-            SELECT bmu.AsOfDate,
+             SELECT bmu.AsOfDate,
                     bmu.BbgTicker,
                     bmu.SecName,
                     RTRIM(LTRIM(bmu.IdSEDOL)),
                     RTRIM(LTRIM(bmu.IdCUSIP)),
                     MAX(bmu.SysStartTime) AS TsDataCapture
-                FROM dbo.BiotechMasterUniverse bmu
-            WHERE (bmu.IdSEDOL IS NOT NULL OR bmu.IdCUSIP IS NOT NULL)
+               FROM dbo.BiotechMasterUniverse bmu
+              WHERE (bmu.IdSEDOL IS NOT NULL OR bmu.IdCUSIP IS NOT NULL)
                 AND bmu.AsOfDate = @AsOfBmu
-            GROUP BY bmu.AsOfDate,
+              GROUP BY bmu.AsOfDate,
                     bmu.BbgTicker,
                     bmu.SecName, 
                     bmu.IdSEDOL,
                     bmu.IdCUSIP
-            HAVING MAX(bmu.SysStartTime) = MAX(bmu.SysStartTime)
-            ORDER BY bmu.AsOfDate,
+             HAVING MAX(bmu.SysStartTime) = MAX(bmu.SysStartTime)
+              ORDER BY bmu.AsOfDate,
                     bmu.BbgTicker, 
                     bmu.SecName,
                     bmu.IdSEDOL,
                     bmu.IdCUSIP
 
-            UPDATE sla
+             UPDATE sla
                 SET sla.AvailAmount = msa.AvailAmount,
                     sla.SLRate = msa.SLRate,
                     sla.SLRateType = msa.SLRateType,
                     sla.slIdentier = msa.Identifier,
                     sla.slIdType = 'SEDOL'
-                FROM #tmpSLAvail sla
-                JOIN dbo.MspbSLAvailability msa
-                ON sla.AsOfDate = msa.AsOfDate
+               FROM #tmpSLAvail sla
+               JOIN dbo.MspbSLAvailability msa
+                 ON sla.AsOfDate = msa.AsOfDate
                 AND sla.IdSedol = msa.Identifier
-            WHERE sla.slIdentier IS NULL 
+              WHERE sla.slIdentier IS NULL 
                 
-            UPDATE sla
+             UPDATE sla
                 SET sla.AvailAmount = msa.AvailAmount,
                     sla.SLRate = msa.SLRate,
                     sla.SLRateType = msa.SLRateType,
                     sla.slIdentier = msa.Identifier,
                     sla.slIdType = 'CUSIP'
-                FROM #tmpSLAvail sla
-                JOIN dbo.MspbSLAvailability msa
-                ON sla.AsOfDate = msa.AsOfDate
+               FROM #tmpSLAvail sla
+               JOIN dbo.MspbSLAvailability msa
+                 ON sla.AsOfDate = msa.AsOfDate
                 AND sla.IdCusip = msa.Identifier
-            WHERE sla.slIdentier IS NULL 
+              WHERE sla.slIdentier IS NULL 
 
         /*  END STOCK LOAN AVAILABILITY CARVE OUT  */
         /*  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX  */
 
-            UPDATE tbo
-            SET tbo.SlDate = sla.AsOfDate,
-                tbo.SlShareAvail = sla.AvailAmount,
-                tbo.SlRebate = sla.SLRate,
-                tbo.SlRateType = sla.SLRateType
-            FROM #tmpBasketOutput tbo
-            JOIN #tmpSLAvail sla
-                ON (tbo.SEDOL = sla.IdSedol OR CHARINDEX(tbo.Ticker, sla.BbgTicker) != 0)
-
+             UPDATE tbo
+                SET tbo.SlDate = sla.AsOfDate,
+                    tbo.SlShareAvail = sla.AvailAmount,
+                    tbo.SlRebate = sla.SLRate,
+                    tbo.SlRateType = sla.SLRateType
+               FROM #tmpBasketOutput tbo
+               JOIN #tmpSLAvail sla
+                 ON (tbo.SEDOL = sla.IdSedol OR CHARINDEX(tbo.Ticker, sla.BbgTicker) != 0)
 
 
         /*  BEGIN AVERAGE VOLUME CARVE OUT           */
         /*  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX  */
 
             UPDATE tbo
-            SET tbo.VolumeDate = amd.AsOfDate,
-                tbo.Avg30dVol = amd.MdValue,
-                tbo.Avg30d$Vol = amd.MdValue * tbo.Price
-            FROM #tmpBasketOutput tbo
-            JOIN dbo.AmfMarketData amd
+               SET tbo.VolumeDate = amd.AsOfDate,
+                   tbo.Avg30dVol = amd.MdValue,
+                   tbo.Avg30d$Vol = amd.MdValue * tbo.Price
+              FROM #tmpBasketOutput tbo
+              JOIN dbo.AmfMarketData amd
                 ON CHARINDEX(tbo.Ticker, amd.PositionId) != 0
-            WHERE amd.PositionIdType = 'BloombergTicker'
-            AND amd.DataSource = 'Bloomberg'
-            AND amd.TagMnemonic = 'VOLUME_AVG_30D'
-            AND amd.AsOfDate = @AsOfVol
+             WHERE amd.PositionIdType = 'BloombergTicker'
+               AND amd.DataSource = 'Bloomberg'
+               AND amd.TagMnemonic = 'VOLUME_AVG_30D'
+               AND amd.AsOfDate = @AsOfVol
 
 
 
